@@ -194,6 +194,7 @@ const INITIAL_ADRAR_LISTINGS: Apartment[] = [
 
 // Seed verified initial tenants and users for Adrar platform
 // Roles: Admin = 1, Customers/Tenants = 0
+// KYC Status: 'unverified' | 'pending' | 'verified' | 'rejected'
 export const INITIAL_PROFILES: UserProfile[] = [
   {
     id: 'user-admin-1',
@@ -203,6 +204,12 @@ export const INITIAL_PROFILES: UserProfile[] = [
     role: 'admin',
     role_code: 1,
     is_active: true,
+    is_verified: true,
+    kyc_status: 'verified',
+    id_card_type: 'بطاقة التعريف الوطنية البيومترية',
+    id_card_number: '109847291039',
+    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
+    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
     created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
@@ -213,6 +220,12 @@ export const INITIAL_PROFILES: UserProfile[] = [
     role: 'admin',
     role_code: 1,
     is_active: true,
+    is_verified: true,
+    kyc_status: 'verified',
+    id_card_type: 'بطاقة التعريف الوطنية البيومترية',
+    id_card_number: '110293847562',
+    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
+    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
     created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
@@ -223,6 +236,12 @@ export const INITIAL_PROFILES: UserProfile[] = [
     role: 'tenant',
     role_code: 0,
     is_active: true,
+    is_verified: true,
+    kyc_status: 'verified',
+    id_card_type: 'بطاقة التعريف الوطنية البيومترية',
+    id_card_number: '114829104820',
+    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
+    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
     created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
@@ -233,17 +252,43 @@ export const INITIAL_PROFILES: UserProfile[] = [
     role: 'tenant',
     role_code: 0,
     is_active: true,
+    is_verified: true,
+    kyc_status: 'verified',
+    id_card_type: 'رخصة السياقة البيومترية',
+    id_card_number: '01/492810',
+    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
+    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
     created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: 'user-client-1',
     email: 'karim.laroussi@gmail.com',
-    full_name: 'كريم لعروسي (عميل مهتم بالكراء)',
+    full_name: 'كريم لعروسي (عميل بانتظار المراجعة)',
     phone: '0770987654',
     role: 'client',
     role_code: 0,
-    is_active: true,
+    is_active: false,
+    is_verified: false,
+    kyc_status: 'pending',
+    id_card_type: 'بطاقة التعريف الوطنية البيومترية',
+    id_card_number: '120938475619',
+    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
+    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
+    id_card_image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
+    kyc_submitted_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'user-client-2',
+    email: 'yassine.adrar@gmail.com',
+    full_name: 'ياسين بن علي (حساب غير مفعل)',
+    phone: '0665432109',
+    role: 'client',
+    role_code: 0,
+    is_active: false,
+    is_verified: false,
+    kyc_status: 'unverified',
+    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
   },
 ];
 
@@ -303,6 +348,94 @@ export async function seedAdminAndInitialUsersInSupabase(): Promise<void> {
 const STORAGE_KEY_LISTINGS = 'adrar_live_listings';
 const STORAGE_KEY_LEASES = 'adrar_live_leases';
 const STORAGE_KEY_PROFILES = 'adrar_live_profiles';
+
+// Client-side image compression utility for fast uploads
+export async function compressImageToDataUrl(
+  file: File,
+  maxWidth = 1280,
+  maxHeight = 1280,
+  quality = 0.82
+): Promise<{ dataUrl: string; blob: Blob }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          const fallback = (e.target?.result as string) || '';
+          resolve({ dataUrl: fallback, blob: file });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        canvas.toBlob(
+          (blob) => {
+            resolve({ dataUrl, blob: blob || file });
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Uploads KYC document to Supabase Storage bucket 'kyc-documents'
+// with automatic fallback to compressed high-quality dataUrl
+export async function uploadKycDocument(
+  userId: string,
+  file: File,
+  side: 'front' | 'back'
+): Promise<string> {
+  try {
+    const { dataUrl, blob } = await compressImageToDataUrl(file);
+    const fileName = `${userId}/id_${side}_${Date.now()}.jpg`;
+
+    const { data, error } = await supabase.storage
+      .from('kyc-documents')
+      .upload(fileName, blob, {
+        contentType: 'image/jpeg',
+        upsert: true,
+      });
+
+    if (!error && data?.path) {
+      const { data: publicUrlData } = supabase.storage
+        .from('kyc-documents')
+        .getPublicUrl(data.path);
+      if (publicUrlData?.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
+    }
+
+    return dataUrl;
+  } catch (err) {
+    console.warn('uploadKycDocument fallback note:', err);
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+  }
+}
 
 export const dbService = {
   // --- PROFILES ---
@@ -408,6 +541,96 @@ export const dbService = {
       if (error) console.warn('Supabase updateProfile error:', error);
     } catch (err) {
       console.warn('Supabase updateProfile error:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
+      if (stored) {
+        const profiles: UserProfile[] = JSON.parse(stored);
+        const idx = profiles.findIndex((p) => p.id === userId);
+        if (idx !== -1) {
+          profiles[idx] = { ...profiles[idx], ...updates };
+          localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
+        }
+      }
+    }
+
+    return true;
+  },
+
+  async submitKycVerification(
+    userId: string,
+    data: {
+      id_card_front: string;
+      id_card_back?: string;
+      id_card_image?: string;
+      id_card_type: string;
+      id_card_number?: string;
+    }
+  ): Promise<boolean> {
+    const front = data.id_card_front || data.id_card_image || '';
+    const back = data.id_card_back || front;
+
+    const updates = {
+      kyc_status: 'pending' as const,
+      is_verified: false,
+      id_card_front: front,
+      id_card_back: back,
+      id_card_image: front,
+      id_card_type: data.id_card_type,
+      id_card_number: data.id_card_number || '',
+      kyc_submitted_at: new Date().toISOString(),
+      kyc_rejection_reason: '',
+    };
+
+    try {
+      await supabase.from('profiles').update(updates).eq('id', userId);
+    } catch (e) {
+      console.warn('submitKycVerification DB warning:', e);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
+      if (stored) {
+        const profiles: UserProfile[] = JSON.parse(stored);
+        const idx = profiles.findIndex((p) => p.id === userId);
+        if (idx !== -1) {
+          profiles[idx] = { ...profiles[idx], ...updates };
+          localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
+        }
+      }
+    }
+
+    return true;
+  },
+
+  async reviewKycVerification(
+    userId: string,
+    decision: 'approve' | 'reject',
+    reason?: string
+  ): Promise<boolean> {
+    const isApproved = decision === 'approve';
+    const updates = isApproved
+      ? {
+          kyc_status: 'verified' as const,
+          is_active: true,
+          is_verified: true,
+          role: 'tenant' as const,
+          kyc_reviewed_at: new Date().toISOString(),
+          kyc_rejection_reason: '',
+        }
+      : {
+          kyc_status: 'rejected' as const,
+          is_active: false,
+          is_verified: false,
+          kyc_reviewed_at: new Date().toISOString(),
+          kyc_rejection_reason: reason || 'صورة بطاقة الهوية غير واضحة أو منتهية الصلاحية، يرجى إعادة رفع صورة واضحة ومقروءة للوجهين.',
+        };
+
+    try {
+      await supabase.from('profiles').update(updates).eq('id', userId);
+    } catch (e) {
+      console.warn('reviewKycVerification DB warning:', e);
     }
 
     if (typeof window !== 'undefined') {

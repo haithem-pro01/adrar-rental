@@ -1,5 +1,7 @@
 export type UserRole = 'admin' | 'tenant' | 'client';
 
+export type KycStatus = 'unverified' | 'pending' | 'pending_review' | 'verified' | 'rejected';
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -8,6 +10,16 @@ export interface UserProfile {
   role: UserRole;
   role_code?: number; // 1 = Admin, 0 = Customers / Tenants
   is_active: boolean;
+  is_verified?: boolean; // Verified tenant status
+  kyc_status: KycStatus; // 'unverified' | 'pending' | 'verified' | 'rejected'
+  id_card_front?: string; // Front image path / data
+  id_card_back?: string; // Back image path / data
+  id_card_image?: string; // Legacy fallback
+  id_card_type?: string;
+  id_card_number?: string;
+  kyc_submitted_at?: string;
+  kyc_reviewed_at?: string;
+  kyc_rejection_reason?: string;
   created_at: string;
 }
 

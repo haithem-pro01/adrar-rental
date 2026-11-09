@@ -12,19 +12,29 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   role TEXT NOT NULL DEFAULT 'client' CHECK (role IN ('admin', 'tenant', 'client')),
   role_code INT NOT NULL DEFAULT 0, -- 1: Admin, 0: Customers & Tenants
   is_active BOOLEAN NOT NULL DEFAULT true,
+  is_verified BOOLEAN NOT NULL DEFAULT false,
+  kyc_status TEXT NOT NULL DEFAULT 'unverified' CHECK (kyc_status IN ('unverified', 'pending', 'pending_review', 'verified', 'rejected')),
+  id_card_front TEXT,
+  id_card_back TEXT,
+  id_card_type TEXT DEFAULT 'بطاقة التعريف الوطنية البيومترية',
+  id_card_number TEXT,
+  kyc_submitted_at TIMESTAMPTZ,
+  kyc_reviewed_at TIMESTAMPTZ,
+  kyc_rejection_reason TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Seed Admin (Role 1) & Initial Accounts (Role 0)
-INSERT INTO public.profiles (id, email, full_name, phone, role, role_code, is_active)
+INSERT INTO public.profiles (id, email, full_name, phone, role, role_code, is_active, is_verified, kyc_status)
 VALUES
-  ('admin-1', 'rental@adrar01', 'مدير المنصة (rental@adrar01)', '0696980328', 'admin', 1, true),
-  ('admin-2', 'haithembenzerga@gmail.com', 'هيثم بن زرقة (المشرف العام)', '0696980328', 'admin', 1, true),
-  ('user-past-1', 'souleymane.touati@yahoo.fr', 'سليمان التواتي (مهندس منتدب)', '0661234567', 'tenant', 0, true),
-  ('user-past-2', 'noureddine.belkheir@gmail.com', 'نور الدين بلخضر', '0550123456', 'tenant', 0, true),
-  ('user-client-1', 'karim.laroussi@gmail.com', 'كريم لعروسي (عميل مهتم بالكراء)', '0770987654', 'client', 0, true)
+  ('admin-1', 'rental@adrar01', 'مدير المنصة (rental@adrar01)', '0696980328', 'admin', 1, true, true, 'verified'),
+  ('admin-2', 'haithembenzerga@gmail.com', 'هيثم بن زرقة (المشرف العام)', '0696980328', 'admin', 1, true, true, 'verified'),
+  ('user-past-1', 'souleymane.touati@yahoo.fr', 'سليمان التواتي (مهندس منتدب)', '0661234567', 'tenant', 0, true, true, 'verified'),
+  ('user-past-2', 'noureddine.belkheir@gmail.com', 'نور الدين بلخضر', '0550123456', 'tenant', 0, true, true, 'verified'),
+  ('user-client-1', 'karim.laroussi@gmail.com', 'كريم لعروسي (عميل بانتظار المراجعة)', '0770987654', 'client', 0, false, false, 'pending'),
+  ('user-client-2', 'yassine.adrar@gmail.com', 'ياسين بن علي (حساب غير مفعل)', '0665432109', 'client', 0, false, false, 'unverified')
 ON CONFLICT (email) DO UPDATE 
-SET role = EXCLUDED.role, role_code = EXCLUDED.role_code;
+SET role = EXCLUDED.role, role_code = EXCLUDED.role_code, kyc_status = EXCLUDED.kyc_status;
 
 -- Enable RLS for Profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -140,3 +150,16 @@ CREATE POLICY "Tenants with ended leases can insert reviews"
         AND leases.status = 'ended'
     )
   );
+
+-- 5. Storage Bucket for KYC Documents (Private Documents)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('kyc-documents', 'kyc-documents', true)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Users can upload their KYC documents"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'kyc-documents');
+
+CREATE POLICY "Users and Admins can view KYC documents"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'kyc-documents');

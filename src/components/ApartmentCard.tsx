@@ -22,7 +22,7 @@ interface ApartmentCardProps {
 }
 
 export const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, onSelect }) => {
-  const { currentUser, openAuthModal } = useAuth();
+  const { currentUser, openAuthModal, openKycModal, showNotification } = useAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [reviewsCount, setReviewsCount] = useState<number>(0);
   const [avgRating, setAvgRating] = useState<string | null>(null);
@@ -59,7 +59,7 @@ export const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, onSelec
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
-  // Strictly enforced Guest vs Logged-In User Booking Flow:
+  // Strictly enforced Guest vs Logged-In User Booking Flow + KYC Verification:
   const handleBookingClick = (e: React.MouseEvent) => {
     e.stopPropagation();
 
@@ -69,6 +69,19 @@ export const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, onSelec
         `يرجى تسجيل الدخول أو إنشاء حساب للمتابعة وحجز الشقة [${apartment.title}] كود [${apartment.code}]`,
         apartment
       );
+      return;
+    }
+
+    // 2. If user is logged in but KYC status is NOT verified (and not admin):
+    const kycStatus = currentUser.kyc_status || (currentUser.is_active ? 'verified' : 'unverified');
+    if (currentUser.role !== 'admin' && kycStatus !== 'verified') {
+      showNotification(
+        kycStatus === 'pending' || kycStatus === 'pending_review'
+          ? 'وثائقك قيد المراجعة حالياً من طرف الإدارة. سيتم إتاحة حجز الشقق فور التفعيل.'
+          : 'يجب تفعيل حسابك برفع بطاقة التعريف أولاً لتتمكن من إرسال طلب الكراء.',
+        'warning'
+      );
+      openKycModal();
       return;
     }
 

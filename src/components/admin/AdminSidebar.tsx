@@ -6,22 +6,25 @@ import {
   Home,
   LayoutDashboard,
   LogOut,
+  ShieldCheck,
   Users,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export type AdminTab = 'overview' | 'properties' | 'tenants' | 'leases' | 'expirations';
+export type AdminTab = 'overview' | 'kyc_queue' | 'properties' | 'tenants' | 'leases' | 'expirations';
 
 interface AdminSidebarProps {
   activeTab: AdminTab;
   setActiveTab: (tab: AdminTab) => void;
   expiringCount: number;
+  pendingKycCount?: number;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   activeTab,
   setActiveTab,
   expiringCount,
+  pendingKycCount = 0,
 }) => {
   const { navigateTo, logout, currentUser } = useAuth();
 
@@ -62,6 +65,25 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               <LayoutDashboard className="w-4 h-4" />
               <span>الإحصائيات ونظرة عامة</span>
             </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('kyc_queue')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'kyc_queue'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'text-stone-700 hover:bg-amber-50/70 hover:text-amber-900'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-amber-500" />
+              <span>طلبات توثيق الهوية (KYC)</span>
+            </div>
+            {pendingKycCount > 0 && (
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+                {pendingKycCount}
+              </span>
+            )}
           </button>
 
           <button

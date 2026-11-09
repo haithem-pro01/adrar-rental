@@ -28,7 +28,7 @@ export const ApartmentDetailsModal: React.FC<ApartmentDetailsModalProps> = ({
   apartment,
   onClose,
 }) => {
-  const { currentUser, openAuthModal } = useAuth();
+  const { currentUser, openAuthModal, openKycModal, showNotification } = useAuth();
   const [activeImgIndex, setActiveImgIndex] = useState(0);
 
   if (!apartment) return null;
@@ -47,6 +47,20 @@ export const ApartmentDetailsModal: React.FC<ApartmentDetailsModalProps> = ({
         `يرجى تسجيل الدخول أو إنشاء حساب للمتابعة وحجز الشقة [${apartment.title}] كود [${apartment.code}]`,
         apartment
       );
+      return;
+    }
+
+    // 2. If logged in but KYC is not verified:
+    const kycStatus = currentUser.kyc_status || (currentUser.is_active ? 'verified' : 'unverified');
+    if (currentUser.role !== 'admin' && kycStatus !== 'verified') {
+      showNotification(
+        kycStatus === 'pending' || kycStatus === 'pending_review'
+          ? 'وثائقك قيد المراجعة حالياً من طرف الإدارة. سيتم إتاحة حجز الشقق فور التفعيل.'
+          : 'يجب تفعيل حسابك برفع بطاقة التعريف أولاً لتتمكن من إرسال طلب الكراء.',
+        'warning'
+      );
+      onClose();
+      openKycModal();
       return;
     }
 

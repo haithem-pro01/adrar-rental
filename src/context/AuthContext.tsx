@@ -25,6 +25,18 @@ interface AuthContextType {
   authModalPrompt: string;
   pendingApartment: Apartment | null;
   clearPendingApartment: () => void;
+  // KYC Identity Verification Modal
+  kycModalOpen: boolean;
+  openKycModal: () => void;
+  closeKycModal: () => void;
+  submitKyc: (data: {
+    id_card_front: string;
+    id_card_back?: string;
+    id_card_image?: string;
+    id_card_type: string;
+    id_card_number?: string;
+  }) => Promise<boolean>;
+  refreshCurrentUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,6 +49,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     message: string;
     type: 'success' | 'warning' | 'error';
   } | null>(null);
+
+  // KYC Modal state
+  const [kycModalOpen, setKycModalOpen] = useState(false);
+  const openKycModal = () => setKycModalOpen(true);
+  const closeKycModal = () => setKycModalOpen(false);
 
   // Guest booking interceptor modal
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -98,7 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               full_name: metadata.full_name || (isAdm ? 'مشرف المنصة (الإدارة)' : 'مستخدم المنصة'),
               phone: metadata.phone || '0696980328',
               role: isAdm ? 'admin' : ((metadata.role as UserRole) || 'client'),
-              is_active: true,
+              role_code: isAdm ? 1 : 0,
+              is_active: isAdm ? true : Boolean(metadata.is_active),
+              kyc_status: isAdm ? 'verified' : ((metadata.kyc_status as any) || 'unverified'),
               created_at: new Date().toISOString(),
             };
             await supabase.from('profiles').upsert(newProf);
@@ -222,7 +241,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             : 'هيثم بن زرقة (مدير المنصة)',
           phone: '0696980328',
           role: 'admin',
+          role_code: 1,
           is_active: true,
+          kyc_status: 'verified',
           created_at: new Date().toISOString(),
         };
 
@@ -267,7 +288,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const profile = existingProfile as UserProfile;
         if (shouldBeAdmin && profile.role !== 'admin') {
           profile.role = 'admin';
-          await supabase.from('profiles').update({ role: 'admin' }).eq('id', profile.id);
+          profile.role_code = 1;
+          profile.kyc_status = 'verified';
+          await supabase.from('profiles').update({ role: 'admin', role_code: 1, kyc_status: 'verified' }).eq('id', profile.id);
         }
         setCurrentUser(profile);
         localStorage.setItem('adrar_user_session', JSON.stringify(profile));
@@ -289,7 +312,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           full_name: authUser.user_metadata?.full_name || (shouldBeAdmin ? 'مشرف المنصة' : 'مستخدم المنصة'),
           phone: authUser.user_metadata?.phone || '0696980328',
           role: shouldBeAdmin ? 'admin' : ((authUser.user_metadata?.role as UserRole) || 'client'),
-          is_active: true,
+          role_code: shouldBeAdmin ? 1 : 0,
+          is_active: shouldBeAdmin ? true : (authUser.user_metadata?.is_active ?? false),
+          kyc_status: shouldBeAdmin ? 'verified' : ((authUser.user_metadata?.kyc_status as any) || 'unverified'),
           created_at: new Date().toISOString(),
         };
         try {
@@ -316,7 +341,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           full_name: cleanEmail.split('@')[0] || 'مستخدم المنصة',
           phone: '0696980328',
           role: shouldBeAdmin ? 'admin' : 'client',
-          is_active: true,
+          role_code: shouldBeAdmin ? 1 : 0,
+          is_active: shouldBeAdmin ? true : false,
+          kyc_status: shouldBeAdmin ? 'verified' : 'unverified',
           created_at: new Date().toISOString(),
         };
         try {
@@ -346,6 +373,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshCurrentUser = async () => {
+    if (!currentUser?.id) return;
+    try {
+      const updated = await dbService.getProfile(currentUser.id);
+      if (updated) {
+        setCurrentUser(updated);
+        localStorage.setItem('adrar_user_session', JSON.stringify(updated));
+      }
+    } catch (err) {
+      console.warn('refreshCurrentUser error:', err);
+    }
+  };
+
+  const submitKyc = async (data: {
+    id_card_front: string;
+    id_card_back?: string;
+    id_card_image?: string;
+    id_card_type: string;
+    id_card_number?: string;
+  }): Promise<boolean> => {
+    if (!currentUser?.id) {
+      showNotification('يرجى تسجيل الدخول أولاً لرفع بطاقة الهوية.', 'warning');
+      return false;
+    }
+
+    try {
+      await dbService.submitKycVerification(currentUser.id, data);
+      const front = data.id_card_front || data.id_card_image || '';
+      const back = data.id_card_back || front;
+
+      const updatedUser: UserProfile = {
+        ...currentUser,
+        kyc_status: 'pending',
+        is_verified: false,
+        id_card_front: front,
+        id_card_back: back,
+        id_card_image: front,
+        id_card_type: data.id_card_type,
+        id_card_number: data.id_card_number,
+        kyc_submitted_at: new Date().toISOString(),
+        kyc_rejection_reason: '',
+      };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('adrar_user_session', JSON.stringify(updatedUser));
+      closeKycModal();
+      showNotification(
+        'تم إرسال وثائق الهوية بنجاح! حسابك الآن قيد المراجعة من طرف إدارة عقارات أدرار.',
+        'success'
+      );
+      return true;
+    } catch (err) {
+      console.warn('submitKyc error:', err);
+      showNotification('تعذر رفع وثيقة الهوية، يرجى المحاولة مرة أخرى.', 'error');
+      return false;
+    }
+  };
+
   const register = async (data: {
     fullName: string;
     email: string;
@@ -358,6 +442,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!data.email.trim()) {
       return { success: false, error: 'يرجى إدخال البريد الإلكتروني أو اسم المستخدم.' };
     }
+    // Strict Algerian phone validation
+    const cleanPhone = data.phone.trim();
+    if (!cleanPhone) {
+      return { success: false, error: 'يرجى إدخال رقم الهاتف الجزائري.' };
+    }
+    if (!isValidAlgerianPhone(cleanPhone)) {
+      return {
+        success: false,
+        error: 'صيغة رقم الهاتف غير صحيحة. يجب أن يكون رقم جزائري يبدأ بـ 05 أو 06 أو 07 متبوعاً بـ 8 أرقام (مثال: 0696980328).',
+      };
+    }
     if (!data.password || data.password.length < 4) {
       return { success: false, error: 'كلمة المرور يجب أن لا تقل عن 4 أحرف أو أرقام.' };
     }
@@ -365,8 +460,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const cleanEmail = data.email.trim().toLowerCase();
-      const cleanPhone = data.phone.trim() || '0696980328';
-      const assignedRole: UserRole = isAdminEmail(cleanEmail) ? 'admin' : 'client';
+      const isAdm = isAdminEmail(cleanEmail);
+      const assignedRole: UserRole = isAdm ? 'admin' : 'client';
+      const roleCode = isAdm ? 1 : 0;
+      const initialKycStatus = isAdm ? 'verified' : 'unverified';
+      const initialActive = isAdm ? true : false; // Non-admin accounts start inactive until KYC verification!
 
       // 1. Send real signup to Supabase Auth so it ALWAYS shows in Supabase dashboard under Authentication -> Users!
       const validAuthEmail =
@@ -384,6 +482,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               full_name: data.fullName.trim(),
               phone: cleanPhone,
               role: assignedRole,
+              role_code: roleCode,
+              kyc_status: initialKycStatus,
             },
           },
         });
@@ -397,7 +497,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Supabase signUp catch:', authErr);
       }
 
-      // 2. Prepare profile
+      // 2. Prepare profile with 3 explicit states: unverified -> pending_review -> verified
       const profileId = authUserId || `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       const newProfile: UserProfile = {
         id: profileId,
@@ -405,7 +505,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         full_name: data.fullName.trim(),
         phone: cleanPhone,
         role: assignedRole,
-        is_active: true,
+        role_code: roleCode,
+        is_active: initialActive,
+        kyc_status: initialKycStatus,
         created_at: new Date().toISOString(),
       };
 
@@ -415,17 +517,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(newProfile);
       localStorage.setItem('adrar_user_session', JSON.stringify(newProfile));
       closeAuthModal();
-      showNotification(
-        assignedRole === 'admin'
-          ? `مرحباً بك يا ${newProfile.full_name} في لوحة الإدارة!`
-          : `تم إنشاء الحساب بنجاح! مرحباً بك يا ${newProfile.full_name}`,
-        'success'
-      );
 
-      if (assignedRole === 'admin') {
+      if (isAdm) {
+        showNotification(`مرحباً بك يا ${newProfile.full_name} في لوحة الإدارة!`, 'success');
         navigateTo('/admin');
       } else {
+        showNotification(
+          `تم إنشاء حسابك بنجاح! حسابك غير مفعل حالياً (غير مفعل) - يرجى رفع بطاقة الهوية لتفعيله ومتابعة الحجز.`,
+          'warning'
+        );
         navigateTo('/app');
+        // Prompt KYC modal immediately for unverified user
+        setTimeout(() => {
+          setKycModalOpen(true);
+        }, 600);
       }
 
       setIsLoading(false);
@@ -466,6 +571,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authModalPrompt,
         pendingApartment,
         clearPendingApartment,
+        kycModalOpen,
+        openKycModal,
+        closeKycModal,
+        submitKyc,
+        refreshCurrentUser,
       }}
     >
       {children}

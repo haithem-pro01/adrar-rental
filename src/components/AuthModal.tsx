@@ -31,7 +31,7 @@ export const AuthModal: React.FC = () => {
 
   if (!authModalOpen) return null;
 
-  const phoneIsValid = phone ? true : true;
+  const phoneIsValid = isValidAlgerianPhone(phone);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,11 +56,21 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
+    if (!phone.trim()) {
+      setFormError('يرجى إدخال رقم الهاتف الجزائري');
+      return;
+    }
+
+    if (!isValidAlgerianPhone(phone.trim())) {
+      setFormError('رقم الهاتف الجزائري غير صحيح. يجب أن يبدأ بـ 05 أو 06 أو 07 متبوعاً بـ 8 أرقام (مثال: 0696980328)');
+      return;
+    }
+
     const res = await register({
       fullName,
       email,
       password,
-      phone: phone || '0696980328',
+      phone: phone.trim(),
     });
 
     if (!res.success) {
@@ -234,20 +244,40 @@ export const AuthModal: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-bold text-stone-700 mb-1">
-                رقم الهاتف (لحجز الشقة)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-stone-700">
+                  رقم الهاتف الجزائري (مطلوب لحجز الشقة)
+                </label>
+                {phone && (
+                  <span className={`text-[10px] font-bold ${phoneIsValid ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {phoneIsValid ? 'رقم صحيح ✓' : 'صيغة غير صحيحة'}
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <Phone className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
                   type="tel"
                   dir="ltr"
+                  required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0696980328 أو أي رقم هاتف"
-                  className="w-full pr-9 pl-3 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:border-[#C85A32] tabular-nums"
+                  placeholder="0696980328"
+                  className={`w-full pr-9 pl-9 py-2.5 rounded-xl border focus:outline-none tabular-nums font-mono transition-colors ${
+                    phone && phoneIsValid
+                      ? 'border-emerald-500 bg-emerald-50/20 text-stone-900 focus:border-emerald-600'
+                      : phone
+                      ? 'border-amber-400 bg-amber-50/20 text-stone-900 focus:border-amber-500'
+                      : 'border-stone-200 focus:border-[#C85A32]'
+                  }`}
                 />
+                {phone && phoneIsValid && (
+                  <CheckCircle2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600" />
+                )}
               </div>
+              <p className="text-[10px] text-stone-400 mt-1">
+                صيغة جزائرية: 05، 06، 07 متبوعة بـ 8 أرقام (مثال: 0696980328)
+              </p>
             </div>
 
             <div>

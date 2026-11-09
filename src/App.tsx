@@ -6,6 +6,7 @@
 import React from 'react';
 import { Building2, Mail, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { AuthModal } from './components/AuthModal';
+import { KycVerificationModal } from './components/KycVerificationModal';
 import { CustomerPortal } from './components/CustomerPortal';
 import { MyActiveRental } from './components/MyActiveRental';
 import { Navbar } from './components/Navbar';
@@ -151,6 +152,9 @@ const AppContent: React.FC = () => {
 
       {/* Global Auth Modal */}
       <AuthModal />
+
+      {/* KYC Verification Modal */}
+      <KycVerificationModal />
 
       {/* Global Notification Toast */}
       <NotificationToast />

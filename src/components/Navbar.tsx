@@ -17,10 +17,12 @@ export const Navbar: React.FC = () => {
     navigateTo,
     logout,
     openAuthModal,
+    openKycModal,
   } = useAuth();
 
   const isAdmin = currentUser?.role === 'admin';
   const isGuest = !currentUser;
+  const kycStatus = currentUser?.kyc_status || (currentUser?.is_active ? 'verified' : 'unverified');
 
   return (
     <header className="sticky top-0 z-40 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-stone-200 shadow-xs">
@@ -108,14 +110,41 @@ export const Navbar: React.FC = () => {
                     {currentUser.full_name ? currentUser.full_name.charAt(0) : 'م'}
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-stone-900 leading-tight truncate max-w-[150px]">
-                      {currentUser.full_name}
-                    </p>
-                    <div className="flex items-center gap-1.5 text-[10px] text-stone-500">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-bold text-stone-900 leading-tight truncate max-w-[130px]">
+                        {currentUser.full_name}
+                      </p>
+                      {/* KYC Status Badge for regular users */}
+                      {!isAdmin && (
+                        <button
+                          type="button"
+                          onClick={openKycModal}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer transition-transform hover:scale-105 ${
+                            kycStatus === 'verified'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : kycStatus === 'pending' || kycStatus === 'pending_review'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse'
+                              : kycStatus === 'rejected'
+                              ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                              : 'bg-amber-50 text-amber-900 border border-amber-300'
+                          }`}
+                          title="انقر لعرض وتوثيق الهوية (KYC)"
+                        >
+                          {kycStatus === 'verified'
+                            ? 'حساب موثق ومفعل ✓'
+                            : kycStatus === 'pending' || kycStatus === 'pending_review'
+                            ? 'قيد المراجعة ⏳'
+                            : kycStatus === 'rejected'
+                            ? 'مرفوض ✕'
+                            : 'غير مفعل ⚠️'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-stone-500 mt-0.5">
                       {isAdmin ? (
                         <span className="inline-flex items-center gap-0.5 text-[#1E4D38] font-bold">
                           <ShieldCheck className="w-3 h-3 text-[#1E4D38]" />
-                          <span>مشرف (Admin)</span>
+                          <span>مشرف (Admin · رتبة 1)</span>
                         </span>
                       ) : (
                         <span className="font-mono tabular-nums">{currentUser.phone || currentUser.email}</span>
@@ -138,6 +167,50 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Unverified / Pending Banner for Logged-in non-admin */}
+      {!isGuest && !isAdmin && kycStatus !== 'verified' && (
+        <div
+          className={`py-2.5 px-4 text-xs font-medium border-t transition-colors ${
+            kycStatus === 'pending' || kycStatus === 'pending_review'
+              ? 'bg-amber-50 border-amber-200 text-amber-950'
+              : kycStatus === 'rejected'
+              ? 'bg-rose-50 border-rose-200 text-rose-950'
+              : 'bg-amber-50/90 border-amber-200 text-amber-900'
+          }`}
+        >
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  kycStatus === 'pending' || kycStatus === 'pending_review'
+                    ? 'bg-amber-500 animate-ping'
+                    : kycStatus === 'rejected'
+                    ? 'bg-rose-500'
+                    : 'bg-[#C85A32]'
+                }`}
+              />
+              <span className="leading-relaxed">
+                {kycStatus === 'pending' || kycStatus === 'pending_review'
+                  ? 'وثائقك قيد المراجعة من طرف الإدارة حالياً. ستتلقى إشعاراً فور التفعيل (عادة خلال دقائق إلى ساعات).'
+                  : kycStatus === 'rejected'
+                  ? `تم رفض وثيقة الهوية: ${currentUser.kyc_rejection_reason || 'الصورة غير واضحة أو منتهية الصلاحية'}. يرجى إعادة رفع صورة واضحة للبطاقة.`
+                  : 'حسابك غير مفعل بعد. يرجى رفع بطاقة التعريف الوطنية لتتمكن من كراء الشقق وتأكيد حجزك.'}
+              </span>
+            </div>
+            <button
+              onClick={openKycModal}
+              className="px-3.5 py-1.5 bg-[#1E4D38] hover:bg-[#153728] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
+            >
+              {kycStatus === 'pending' || kycStatus === 'pending_review'
+                ? 'متابعة الطلب'
+                : kycStatus === 'rejected'
+                ? 'إعادة الرفع الآن'
+                : 'رفع بطاقة الهوية'}
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 };
