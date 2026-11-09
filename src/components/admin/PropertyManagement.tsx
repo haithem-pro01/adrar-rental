@@ -34,10 +34,10 @@ const ADRAR_MUNICIPALITIES: Municipality[] = [
 ];
 
 const PRESET_IMAGES = [
-  { label: 'شقة عصرية بأدرار', url: '/src/assets/images/apartment_adrar_modern_1_1794234918725.jpg' },
-  { label: 'قصر تيميمون التراثي', url: '/src/assets/images/apartment_timimoun_palmeraie_1794234919292.jpg' },
-  { label: 'إقامة رقان الفاخرة', url: '/src/assets/images/apartment_reggane_suite_1794234919330.jpg' },
-  { label: 'فيلا الواحات الكبرى', url: '/src/assets/images/hero_adrar_luxury_1794234917435.jpg' },
+  { label: 'شقة عصرية بأدرار', url: '/images/apartment_adrar_modern_1_1794234918725.jpg' },
+  { label: 'قصر تيميمون التراثي', url: '/images/apartment_timimoun_palmeraie_1794234919292.jpg' },
+  { label: 'إقامة رقان الفاخرة', url: '/images/apartment_reggane_suite_1794234919330.jpg' },
+  { label: 'فيلا الواحات الكبرى', url: '/images/hero_adrar_luxury_1794234917435.jpg' },
 ];
 
 export const PropertyManagement: React.FC<PropertyManagementProps> = ({
@@ -73,7 +73,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
     'أنترنت فايبر',
   ]);
   const [images, setImages] = useState<string[]>([
-    '/src/assets/images/apartment_adrar_modern_1_1794234918725.jpg',
+    '/images/apartment_adrar_modern_1_1794234918725.jpg',
   ]);
   const [status, setStatus] = useState<ApartmentStatus>('available');
   const [landlordPhone, setLandlordPhone] = useState('0661234567');
@@ -94,7 +94,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
     setArea(115);
     setFloor('الطابق الأول');
     setAmenities(['مكيف صحراوي', 'خزان ماء 2000 لتر', 'مطبخ مجهز', 'أنترنت فايبر']);
-    setImages(['/src/assets/images/apartment_adrar_modern_1_1794234918725.jpg']);
+    setImages(['/images/apartment_adrar_modern_1_1794234918725.jpg']);
     setStatus('available');
     setLandlordPhone('0661234567');
     setLandlordName('وكالة واحة أدرار');
@@ -338,7 +338,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
                         <img
-                          src={apt.images?.[0] || '/src/assets/images/apartment_adrar_modern_1_1794234918725.jpg'}
+                          src={apt.images?.[0] || '/images/apartment_adrar_modern_1_1794234918725.jpg'}
                           alt={apt.title}
                           referrerPolicy="no-referrer"
                           className="w-12 h-10 rounded-lg object-cover bg-stone-100 shrink-0 border border-stone-200"

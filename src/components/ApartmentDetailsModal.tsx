@@ -33,9 +33,11 @@ export const ApartmentDetailsModal: React.FC<ApartmentDetailsModalProps> = ({
 
   if (!apartment) return null;
 
-  const images = apartment.images && apartment.images.length > 0
+  const rawImages = apartment.images && apartment.images.length > 0
     ? apartment.images
-    : ['/src/assets/images/apartment_adrar_modern_1_1794234918725.jpg'];
+    : ['/images/apartment_adrar_modern_1_1794234918725.jpg'];
+
+  const images = rawImages.map((img) => img.replace('/src/assets/images/', '/images/'));
 
   const handleBooking = () => {
     // 1. If not logged in, prompt to log in first!

@@ -43,9 +43,11 @@ export const ApartmentCard: React.FC<ApartmentCardProps> = ({ apartment, onSelec
     };
   }, [apartment.id]);
 
-  const images = apartment.images && apartment.images.length > 0
+  const rawImages = apartment.images && apartment.images.length > 0
     ? apartment.images
-    : ['/src/assets/images/apartment_adrar_modern_1_1794234918725.jpg'];
+    : ['/images/apartment_adrar_modern_1_1794234918725.jpg'];
+
+  const images = rawImages.map((img) => img.replace('/src/assets/images/', '/images/'));
 
   const nextImage = (e: React.MouseEvent) => {
     e.stopPropagation();

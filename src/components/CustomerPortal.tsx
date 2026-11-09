@@ -96,7 +96,7 @@ export const CustomerPortal: React.FC = () => {
       <section className="relative overflow-hidden bg-[#1E4D38] text-white">
         <div className="absolute inset-0 z-0 opacity-25">
           <img
-            src="/src/assets/images/hero_adrar_luxury_1794234917435.jpg"
+            src="/images/hero_adrar_luxury_1794234917435.jpg"
             alt="Adrar Saharan Oasis"
             className="w-full h-full object-cover"
           />

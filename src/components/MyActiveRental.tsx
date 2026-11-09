@@ -184,7 +184,7 @@ export const MyActiveRental: React.FC = () => {
             <div className="flex items-center gap-4">
               <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-stone-100 shrink-0 border border-stone-200">
                 <img
-                  src={activeLease.apartment_image || '/src/assets/images/apartment_adrar_modern_1_1794234918725.jpg'}
+                  src={activeLease.apartment_image || '/images/apartment_adrar_modern_1_1794234918725.jpg'}
                   alt={activeLease.apartment_title}
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"
@@ -288,7 +288,7 @@ export const MyActiveRental: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <div className="w-14 h-14 rounded-xl overflow-hidden bg-stone-200 shrink-0">
                     <img
-                      src={endedLease.apartment_image || '/src/assets/images/apartment_adrar_modern_1_1794234918725.jpg'}
+                      src={endedLease.apartment_image || '/images/apartment_adrar_modern_1_1794234918725.jpg'}
                       alt={endedLease.apartment_title}
                       className="w-full h-full object-cover"
                     />
