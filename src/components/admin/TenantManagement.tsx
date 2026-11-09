@@ -248,17 +248,28 @@ export const TenantManagement: React.FC<TenantManagementProps> = ({
                         </div>
                       </td>
 
-                      {/* Role */}
+                      {/* Role with Role 1 (Admin) and Role 0 (Customers) */}
                       <td className="py-3 px-4">
-                        <select
-                          value={tenant.role}
-                          onChange={(e) => handleRoleChange(tenant, e.target.value as 'admin' | 'tenant' | 'client')}
-                          className="py-1 px-2 text-[11px] font-bold rounded-lg border border-stone-200 bg-stone-50 text-stone-800"
-                        >
-                          <option value="admin">مشرف (Admin)</option>
-                          <option value="tenant">مستأجر (Tenant)</option>
-                          <option value="client">عميل (Client)</option>
-                        </select>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              tenant.role === 'admin'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-stone-100 text-stone-600'
+                            }`}
+                          >
+                            {tenant.role === 'admin' ? 'رتبة 1' : 'رتبة 0'}
+                          </span>
+                          <select
+                            value={tenant.role}
+                            onChange={(e) => handleRoleChange(tenant, e.target.value as 'admin' | 'tenant' | 'client')}
+                            className="py-1 px-2 text-[11px] font-bold rounded-lg border border-stone-200 bg-stone-50 text-stone-800"
+                          >
+                            <option value="admin">مشرف (Role 1)</option>
+                            <option value="tenant">مستأجر (Role 0)</option>
+                            <option value="client">عميل (Role 0)</option>
+                          </select>
+                        </div>
                       </td>
 
                       {/* Active Status & Activate Button as required */}

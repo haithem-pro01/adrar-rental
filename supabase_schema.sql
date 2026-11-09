@@ -10,9 +10,21 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   full_name TEXT NOT NULL,
   phone TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'client' CHECK (role IN ('admin', 'tenant', 'client')),
+  role_code INT NOT NULL DEFAULT 0, -- 1: Admin, 0: Customers & Tenants
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Seed Admin (Role 1) & Initial Accounts (Role 0)
+INSERT INTO public.profiles (id, email, full_name, phone, role, role_code, is_active)
+VALUES
+  ('admin-1', 'rental@adrar01', 'مدير المنصة (rental@adrar01)', '0696980328', 'admin', 1, true),
+  ('admin-2', 'haithembenzerga@gmail.com', 'هيثم بن زرقة (المشرف العام)', '0696980328', 'admin', 1, true),
+  ('user-past-1', 'souleymane.touati@yahoo.fr', 'سليمان التواتي (مهندس منتدب)', '0661234567', 'tenant', 0, true),
+  ('user-past-2', 'noureddine.belkheir@gmail.com', 'نور الدين بلخضر', '0550123456', 'tenant', 0, true),
+  ('user-client-1', 'karim.laroussi@gmail.com', 'كريم لعروسي (عميل مهتم بالكراء)', '0770987654', 'client', 0, true)
+ON CONFLICT (email) DO UPDATE 
+SET role = EXCLUDED.role, role_code = EXCLUDED.role_code;
 
 -- Enable RLS for Profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;

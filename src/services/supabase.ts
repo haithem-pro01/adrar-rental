@@ -193,13 +193,15 @@ const INITIAL_ADRAR_LISTINGS: Apartment[] = [
 ];
 
 // Seed verified initial tenants and users for Adrar platform
-const INITIAL_PROFILES: UserProfile[] = [
+// Roles: Admin = 1, Customers/Tenants = 0
+export const INITIAL_PROFILES: UserProfile[] = [
   {
     id: 'user-admin-1',
     email: 'rental@adrar01',
     full_name: 'مدير المنصة (rental@adrar01)',
     phone: '0696980328',
     role: 'admin',
+    role_code: 1,
     is_active: true,
     created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
   },
@@ -209,6 +211,7 @@ const INITIAL_PROFILES: UserProfile[] = [
     full_name: 'هيثم بن زرقة (المشرف العام)',
     phone: '0696980328',
     role: 'admin',
+    role_code: 1,
     is_active: true,
     created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
   },
@@ -218,6 +221,7 @@ const INITIAL_PROFILES: UserProfile[] = [
     full_name: 'سليمان التواتي (مهندس منتدب)',
     phone: '0661234567',
     role: 'tenant',
+    role_code: 0,
     is_active: true,
     created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
   },
@@ -227,6 +231,7 @@ const INITIAL_PROFILES: UserProfile[] = [
     full_name: 'نور الدين بلخضر',
     phone: '0550123456',
     role: 'tenant',
+    role_code: 0,
     is_active: true,
     created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
   },
@@ -236,10 +241,63 @@ const INITIAL_PROFILES: UserProfile[] = [
     full_name: 'كريم لعروسي (عميل مهتم بالكراء)',
     phone: '0770987654',
     role: 'client',
+    role_code: 0,
     is_active: true,
     created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
   },
 ];
+
+// Automatically seeds admin and initial users into Supabase Auth & Database
+export async function seedAdminAndInitialUsersInSupabase(): Promise<void> {
+  try {
+    // 1. Register haithembenzerga@gmail.com in Supabase Auth (role_code: 1)
+    try {
+      await supabase.auth.signUp({
+        email: 'haithembenzerga@gmail.com',
+        password: 'Password123!',
+        options: {
+          data: {
+            full_name: 'هيثم بن زرقة (المشرف العام)',
+            phone: '0696980328',
+            role: 'admin',
+            role_code: 1,
+          },
+        },
+      });
+    } catch (e) {
+      console.warn('Seed haithembenzerga auth note:', e);
+    }
+
+    // 2. Register rental@adrar-immo.dz in Supabase Auth (role_code: 1)
+    try {
+      await supabase.auth.signUp({
+        email: 'rental@adrar-immo.dz',
+        password: 'Password123!',
+        options: {
+          data: {
+            full_name: 'مدير المنصة (rental@adrar01)',
+            phone: '0696980328',
+            role: 'admin',
+            role_code: 1,
+          },
+        },
+      });
+    } catch (e) {
+      console.warn('Seed rental auth note:', e);
+    }
+
+    // 3. Upsert profiles to Supabase profiles table
+    for (const prof of INITIAL_PROFILES) {
+      try {
+        await supabase.from('profiles').upsert(prof);
+      } catch (err) {
+        console.warn('Seed profile DB note:', err);
+      }
+    }
+  } catch (err) {
+    console.warn('seedAdminAndInitialUsersInSupabase general note:', err);
+  }
+}
 
 // Local store fallback keys
 const STORAGE_KEY_LISTINGS = 'adrar_live_listings';

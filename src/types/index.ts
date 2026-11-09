@@ -6,6 +6,7 @@ export interface UserProfile {
   full_name: string;
   phone: string;
   role: UserRole;
+  role_code?: number; // 1 = Admin, 0 = Customers / Tenants
   is_active: boolean;
   created_at: string;
 }

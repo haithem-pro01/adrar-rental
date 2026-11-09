@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { dbService, isValidAlgerianPhone, supabase } from '../services/supabase';
+import { dbService, isValidAlgerianPhone, seedAdminAndInitialUsersInSupabase, supabase } from '../services/supabase';
 import { Apartment, UserProfile, UserRole } from '../types';
 
 interface AuthContextType {
@@ -75,6 +75,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initSession = async () => {
       setIsLoading(true);
       try {
+        // Seed admin and initial platform accounts into Supabase in background
+        seedAdminAndInitialUsersInSupabase().catch(() => {});
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (!sessionError && session?.user) {
           const profile = await dbService.getProfile(session.user.id);
