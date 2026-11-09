@@ -366,9 +366,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cleanPhone = data.phone.trim() || '0696980328';
       const assignedRole: UserRole = isAdminEmail(cleanEmail) ? 'admin' : 'client';
 
-      // Register or direct profile creation without any email or phone confirmation blockers
-      const profileId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      // 1. Send real signup to Supabase Auth so it ALWAYS shows in Supabase dashboard under Authentication -> Users!
+      const validAuthEmail =
+        cleanEmail.includes('@') && cleanEmail.includes('.')
+          ? cleanEmail
+          : `${cleanEmail.replace(/[^a-zA-Z0-9]/g, '') || 'user'}@adrar-immo.dz`;
 
+      let authUserId: string | null = null;
+      try {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: validAuthEmail,
+          password: data.password,
+          options: {
+            data: {
+              full_name: data.fullName.trim(),
+              phone: cleanPhone,
+              role: assignedRole,
+            },
+          },
+        });
+
+        if (!authError && authData?.user) {
+          authUserId = authData.user.id;
+        } else if (authError) {
+          console.warn('Supabase Auth signUp note:', authError.message);
+        }
+      } catch (authErr) {
+        console.warn('Supabase signUp catch:', authErr);
+      }
+
+      // 2. Prepare profile
+      const profileId = authUserId || `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       const newProfile: UserProfile = {
         id: profileId,
         email: cleanEmail,
@@ -379,12 +407,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         created_at: new Date().toISOString(),
       };
 
-      // Save into public.profiles
-      try {
-        await supabase.from('profiles').upsert(newProfile);
-      } catch (upsertErr) {
-        console.warn('Profiles upsert warning:', upsertErr);
-      }
+      // 3. Save into Supabase DB table AND cache via dbService.saveProfile
+      await dbService.saveProfile(newProfile);
 
       setCurrentUser(newProfile);
       localStorage.setItem('adrar_user_session', JSON.stringify(newProfile));

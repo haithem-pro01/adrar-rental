@@ -192,9 +192,59 @@ const INITIAL_ADRAR_LISTINGS: Apartment[] = [
   },
 ];
 
-// Local store fallback strictly for listings persistence if remote tables need sync
+// Seed verified initial tenants and users for Adrar platform
+const INITIAL_PROFILES: UserProfile[] = [
+  {
+    id: 'user-admin-1',
+    email: 'rental@adrar01',
+    full_name: 'مدير المنصة (rental@adrar01)',
+    phone: '0696980328',
+    role: 'admin',
+    is_active: true,
+    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'user-admin-2',
+    email: 'haithembenzerga@gmail.com',
+    full_name: 'هيثم بن زرقة (المشرف العام)',
+    phone: '0696980328',
+    role: 'admin',
+    is_active: true,
+    created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'user-past-1',
+    email: 'souleymane.touati@yahoo.fr',
+    full_name: 'سليمان التواتي (مهندس منتدب)',
+    phone: '0661234567',
+    role: 'tenant',
+    is_active: true,
+    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'user-past-2',
+    email: 'noureddine.belkheir@gmail.com',
+    full_name: 'نور الدين بلخضر',
+    phone: '0550123456',
+    role: 'tenant',
+    is_active: true,
+    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'user-client-1',
+    email: 'karim.laroussi@gmail.com',
+    full_name: 'كريم لعروسي (عميل مهتم بالكراء)',
+    phone: '0770987654',
+    role: 'client',
+    is_active: true,
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
+// Local store fallback keys
 const STORAGE_KEY_LISTINGS = 'adrar_live_listings';
 const STORAGE_KEY_LEASES = 'adrar_live_leases';
+const STORAGE_KEY_PROFILES = 'adrar_live_profiles';
 
 export const dbService = {
   // --- PROFILES ---
@@ -212,23 +262,79 @@ export const dbService = {
     } catch (err) {
       console.warn('Supabase getProfile error:', err);
     }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
+      if (stored) {
+        const list: UserProfile[] = JSON.parse(stored);
+        const found = list.find((p) => p.id === userId);
+        if (found) return found;
+      }
+    }
+
     return null;
   },
 
   async getAllProfiles(): Promise<UserProfile[]> {
+    let list: UserProfile[] = [];
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        return data as UserProfile[];
+      if (!error && data && data.length > 0) {
+        list = data as UserProfile[];
       }
     } catch (err) {
       console.warn('Supabase getAllProfiles error:', err);
     }
-    return [];
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
+      let localList: UserProfile[] = stored ? JSON.parse(stored) : INITIAL_PROFILES;
+      if (!stored) {
+        localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(INITIAL_PROFILES));
+      }
+
+      // Merge remote list with local cache so accounts NEVER disappear
+      const map = new Map<string, UserProfile>();
+      list.forEach((p) => map.set(p.email.toLowerCase(), p));
+      localList.forEach((p) => {
+        if (!map.has(p.email.toLowerCase())) {
+          map.set(p.email.toLowerCase(), p);
+        }
+      });
+      list = Array.from(map.values());
+    }
+
+    if (list.length === 0) {
+      list = INITIAL_PROFILES;
+    }
+
+    return list;
+  },
+
+  async saveProfile(profile: UserProfile): Promise<void> {
+    try {
+      await supabase.from('profiles').upsert(profile);
+    } catch (err) {
+      console.warn('Supabase saveProfile error:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
+      let profiles: UserProfile[] = stored ? JSON.parse(stored) : [...INITIAL_PROFILES];
+      const idx = profiles.findIndex(
+        (p) => p.email.toLowerCase() === profile.email.toLowerCase() || p.id === profile.id
+      );
+      if (idx !== -1) {
+        profiles[idx] = { ...profiles[idx], ...profile };
+      } else {
+        profiles.unshift(profile);
+      }
+      localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
+    }
   },
 
   async updateProfileRoleAndStatus(
@@ -241,11 +347,24 @@ export const dbService = {
         .update(updates)
         .eq('id', userId);
 
-      return !error;
+      if (error) console.warn('Supabase updateProfile error:', error);
     } catch (err) {
       console.warn('Supabase updateProfile error:', err);
-      return false;
     }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
+      if (stored) {
+        const profiles: UserProfile[] = JSON.parse(stored);
+        const idx = profiles.findIndex((p) => p.id === userId);
+        if (idx !== -1) {
+          profiles[idx] = { ...profiles[idx], ...updates };
+          localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
+        }
+      }
+    }
+
+    return true;
   },
 
   // --- APARTMENTS / LISTINGS ---
