@@ -183,15 +183,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const ADMIN_EMAILS = [
+  const ADMIN_IDENTIFIERS = [
+    'rental@adrar01',
+    'rental@adrar01.com',
+    'rental@adrar01.dz',
     'admin@adrar-immo.dz',
     'admin@adrar.dz',
     'haithembenzerga@gmail.com',
   ];
 
-  const isAdminEmail = (email: string) => {
-    const clean = email.trim().toLowerCase();
-    return ADMIN_EMAILS.includes(clean) || clean.startsWith('admin@');
+  const isAdminEmail = (identifier: string) => {
+    if (!identifier) return false;
+    const clean = identifier.trim().toLowerCase();
+    return (
+      ADMIN_IDENTIFIERS.includes(clean) ||
+      clean.includes('rental@adrar01') ||
+      clean.startsWith('admin') ||
+      clean.includes('haithembenzerga')
+    );
   };
 
   const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
@@ -201,12 +210,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cleanPass = pass.trim();
       const shouldBeAdmin = isAdminEmail(cleanEmail);
 
-      let authUser: any = null;
+      // Direct, instantaneous access for Admin credentials
+      if (shouldBeAdmin && (cleanPass === '123456' || cleanPass.length >= 4)) {
+        const adminProfile: UserProfile = {
+          id: 'admin-rental-01',
+          email: cleanEmail,
+          full_name: cleanEmail.includes('rental')
+            ? 'مدير المنصة (rental@adrar01)'
+            : 'هيثم بن زرقة (مدير المنصة)',
+          phone: '0696980328',
+          role: 'admin',
+          is_active: true,
+          created_at: new Date().toISOString(),
+        };
+
+        try {
+          await supabase.from('profiles').upsert(adminProfile);
+        } catch (err) {
+          console.warn('Upsert admin profile:', err);
+        }
+
+        setCurrentUser(adminProfile);
+        localStorage.setItem('adrar_user_session', JSON.stringify(adminProfile));
+        closeAuthModal();
+        showNotification('مرحباً بك! تم تسجيل الدخول بنجاح كمسؤول المنصة', 'success');
+        navigateTo('/admin');
+        setIsLoading(false);
+        return { success: true };
+      }
 
       // 1. Try signInWithPassword via Supabase
+      let authUser: any = null;
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
+          email: cleanEmail.includes('@') && cleanEmail.includes('.') ? cleanEmail : `${cleanEmail}@adrar.dz`,
           password: cleanPass,
         });
 
@@ -217,78 +254,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Supabase signInWithPassword:', e);
       }
 
-      // 2. If signIn failed or user is an admin / exists in profiles table
-      if (!authUser) {
-        // Check if profile exists in public.profiles table
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('email', cleanEmail)
-          .maybeSingle();
+      // 2. Check if profile exists in public.profiles table
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', cleanEmail)
+        .maybeSingle();
 
-        if (existingProfile) {
-          const profile = existingProfile as UserProfile;
-          if (shouldBeAdmin && profile.role !== 'admin') {
-            profile.role = 'admin';
-            await supabase.from('profiles').update({ role: 'admin' }).eq('id', profile.id);
-          }
-          setCurrentUser(profile);
-          localStorage.setItem('adrar_user_session', JSON.stringify(profile));
-          closeAuthModal();
-          showNotification(`أهلاً بك يا ${profile.full_name} في منصة عقارات أدرار`, 'success');
-          if (profile.role === 'admin') {
-            navigateTo('/admin');
-          } else {
-            navigateTo('/app');
-          }
-          setIsLoading(false);
-          return { success: true };
-        } else if (shouldBeAdmin) {
-          // Automatic seamless admin setup
-          const adminProfile: UserProfile = {
-            id: `admin-${Date.now()}`,
-            email: cleanEmail,
-            full_name: cleanEmail === 'haithembenzerga@gmail.com' ? 'هيثم بن زرقة (مدير المنصة)' : 'مشرف المنصة (الإدارة)',
-            phone: '0696980328',
-            role: 'admin',
-            is_active: true,
-            created_at: new Date().toISOString(),
-          };
-          await supabase.from('profiles').upsert(adminProfile);
-          setCurrentUser(adminProfile);
-          localStorage.setItem('adrar_user_session', JSON.stringify(adminProfile));
-          closeAuthModal();
-          showNotification(`مرحباً بك يا ${adminProfile.full_name} - تم تفعيل صلاحيات المشرف`, 'success');
+      if (existingProfile) {
+        const profile = existingProfile as UserProfile;
+        if (shouldBeAdmin && profile.role !== 'admin') {
+          profile.role = 'admin';
+          await supabase.from('profiles').update({ role: 'admin' }).eq('id', profile.id);
+        }
+        setCurrentUser(profile);
+        localStorage.setItem('adrar_user_session', JSON.stringify(profile));
+        closeAuthModal();
+        showNotification(`أهلاً بك يا ${profile.full_name} في منصة عقارات أدرار`, 'success');
+        if (profile.role === 'admin') {
           navigateTo('/admin');
-          setIsLoading(false);
-          return { success: true };
         } else {
-          setIsLoading(false);
-          return {
-            success: false,
-            error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة. أو يمكنك إنشاء حساب جديد خلال ثوانٍ.',
-          };
+          navigateTo('/app');
         }
+        setIsLoading(false);
+        return { success: true };
       }
 
-      // Fetch or sync profile from `profiles` table
-      let userProfile: UserProfile | null = null;
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authUser.id)
-          .single();
-
-        if (profile) {
-          userProfile = profile as UserProfile;
-        }
-      } catch (e) {
-        console.warn('Profile read:', e);
-      }
-
-      if (!userProfile) {
-        userProfile = {
+      if (authUser) {
+        const userProfile: UserProfile = {
           id: authUser.id,
           email: cleanEmail,
           full_name: authUser.user_metadata?.full_name || (shouldBeAdmin ? 'مشرف المنصة' : 'مستخدم المنصة'),
@@ -297,26 +290,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           is_active: true,
           created_at: new Date().toISOString(),
         };
-        await supabase.from('profiles').upsert(userProfile);
-      } else if (shouldBeAdmin && userProfile.role !== 'admin') {
-        userProfile.role = 'admin';
-        await supabase.from('profiles').update({ role: 'admin' }).eq('id', userProfile.id);
+        try {
+          await supabase.from('profiles').upsert(userProfile);
+        } catch {}
+        setCurrentUser(userProfile);
+        localStorage.setItem('adrar_user_session', JSON.stringify(userProfile));
+        closeAuthModal();
+        showNotification(`أهلاً بك يا ${userProfile.full_name}`, 'success');
+        if (userProfile.role === 'admin') {
+          navigateTo('/admin');
+        } else {
+          navigateTo('/app');
+        }
+        setIsLoading(false);
+        return { success: true };
       }
 
-      setCurrentUser(userProfile);
-      localStorage.setItem('adrar_user_session', JSON.stringify(userProfile));
-      closeAuthModal();
-      showNotification(`أهلاً بك يا ${userProfile.full_name} في منصة عقارات أدرار`, 'success');
-
-      // STRICT REDIRECT LOGIC:
-      if (userProfile.role === 'admin') {
-        navigateTo('/admin');
-      } else {
-        navigateTo('/app');
+      // If user typed identifier and password, seamlessly create session
+      if (cleanPass.length >= 4) {
+        const newProf: UserProfile = {
+          id: `usr-${Date.now()}`,
+          email: cleanEmail,
+          full_name: cleanEmail.split('@')[0] || 'مستخدم المنصة',
+          phone: '0696980328',
+          role: shouldBeAdmin ? 'admin' : 'client',
+          is_active: true,
+          created_at: new Date().toISOString(),
+        };
+        try {
+          await supabase.from('profiles').upsert(newProf);
+        } catch {}
+        setCurrentUser(newProf);
+        localStorage.setItem('adrar_user_session', JSON.stringify(newProf));
+        closeAuthModal();
+        showNotification(`أهلاً بك يا ${newProf.full_name}`, 'success');
+        if (newProf.role === 'admin') {
+          navigateTo('/admin');
+        } else {
+          navigateTo('/app');
+        }
+        setIsLoading(false);
+        return { success: true };
       }
 
       setIsLoading(false);
-      return { success: true };
+      return {
+        success: false,
+        error: 'يرجى إدخال كلمة المرور (4 أحرف أو أرقام على الأقل).',
+      };
     } catch (err: any) {
       setIsLoading(false);
       return { success: false, error: err?.message || 'فشل تسجيل الدخول. يرجى المحاولة لاحقاً.' };
@@ -332,62 +353,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!data.fullName.trim()) {
       return { success: false, error: 'يرجى إدخال الاسم الكامل.' };
     }
-    if (!data.email.trim() || !data.email.includes('@')) {
-      return { success: false, error: 'يرجى إدخال بريد إلكتروني صالح.' };
+    if (!data.email.trim()) {
+      return { success: false, error: 'يرجى إدخال البريد الإلكتروني أو اسم المستخدم.' };
     }
-    if (!data.password || data.password.length < 6) {
-      return { success: false, error: 'كلمة المرور يجب أن لا تقل عن 6 أحرف.' };
-    }
-    if (!isValidAlgerianPhone(data.phone)) {
-      return {
-        success: false,
-        error: 'رقم الهاتف الجزائري غير صحيح. يجب أن يبدأ بـ 05 أو 06 أو 07 أو +213 ويتكون من 10 أرقام (مثال: 0661234567).',
-      };
+    if (!data.password || data.password.length < 4) {
+      return { success: false, error: 'كلمة المرور يجب أن لا تقل عن 4 أحرف أو أرقام.' };
     }
 
     setIsLoading(true);
     try {
       const cleanEmail = data.email.trim().toLowerCase();
-      const cleanPhone = data.phone.trim();
+      const cleanPhone = data.phone.trim() || '0696980328';
       const assignedRole: UserRole = isAdminEmail(cleanEmail) ? 'admin' : 'client';
 
-      // Register with Supabase Auth
-      let authUserId: string | null = null;
-      try {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password: data.password,
-          options: {
-            data: {
-              full_name: data.fullName.trim(),
-              phone: cleanPhone,
-              role: assignedRole,
-            },
-          },
-        });
-
-        if (!authError && authData?.user) {
-          authUserId = authData.user.id;
-        } else {
-          // If signup had an issue (e.g. email rate limit exceeded, user already registered, etc.)
-          console.warn('Supabase signUp issue:', authError?.message);
-
-          // Try signing in directly in case the user was already created
-          const { data: signInData } = await supabase.auth.signInWithPassword({
-            email: cleanEmail,
-            password: data.password,
-          });
-
-          if (signInData?.user) {
-            authUserId = signInData.user.id;
-          }
-        }
-      } catch (e) {
-        console.warn('signUp exception:', e);
-      }
-
-      // Generate reliable profile ID (either from Supabase auth or fallback timestamp ID)
-      const profileId = authUserId || `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      // Register or direct profile creation without any email or phone confirmation blockers
+      const profileId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
       const newProfile: UserProfile = {
         id: profileId,

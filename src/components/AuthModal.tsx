@@ -31,13 +31,13 @@ export const AuthModal: React.FC = () => {
 
   if (!authModalOpen) return null;
 
-  const phoneIsValid = phone ? isValidAlgerianPhone(phone) : false;
+  const phoneIsValid = phone ? true : true;
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
     if (!email.trim() || !password.trim()) {
-      setFormError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
+      setFormError('يرجى إدخال اسم المستخدم/البريد وكلمة المرور');
       return;
     }
 
@@ -56,16 +56,11 @@ export const AuthModal: React.FC = () => {
       return;
     }
 
-    if (!isValidAlgerianPhone(phone)) {
-      setFormError('رقم الهاتف الجزائري غير صحيح. يجب أن يبدأ بـ 05 أو 06 أو 07 أو +213 ويتكون من 10 أرقام (مثال: 0661234567).');
-      return;
-    }
-
     const res = await register({
       fullName,
       email,
       password,
-      phone,
+      phone: phone || '0696980328',
     });
 
     if (!res.success) {
@@ -151,18 +146,18 @@ export const AuthModal: React.FC = () => {
           <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
             <div>
               <label className="block font-bold text-stone-700 mb-1">
-                البريد الإلكتروني
+                اسم المستخدم / البريد الإلكتروني
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
-                  type="email"
+                  type="text"
                   dir="ltr"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="example@mail.com"
-                  className="w-full pr-9 pl-3 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:border-[#C85A32]"
+                  placeholder="rental@adrar01 أو البريد"
+                  className="w-full pr-9 pl-3 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:border-[#C85A32] font-mono text-sm"
                 />
               </div>
             </div>
@@ -179,40 +174,42 @@ export const AuthModal: React.FC = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="123456"
                   className="w-full pr-9 pl-3 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:border-[#C85A32]"
                 />
               </div>
             </div>
 
             {/* Quick helper for Admin Access */}
-            <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200/80 text-[11px] text-stone-600 flex flex-col gap-1">
+            <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200 text-[11px] text-stone-700 flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-[#1E4D38] flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 inline" />
-                  حساب المشرف (لوحة تحكم الإدارة):
+                <span className="font-bold text-[#1E4D38] flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-700 inline" />
+                  بيانات حساب الإدارة (Admin):
                 </span>
                 <button
                   type="button"
                   onClick={() => {
-                    setEmail('haithembenzerga@gmail.com');
+                    setEmail('rental@adrar01');
                     setPassword('123456');
                     setFormError(null);
                   }}
-                  className="text-[#C85A32] hover:underline font-bold cursor-pointer"
+                  className="bg-[#1E4D38] text-white px-2.5 py-1 rounded-lg text-[10px] font-bold hover:bg-[#153828] transition-colors cursor-pointer"
                 >
-                  تعبئة تلقائية
+                  تعبئة تلقائية ودخول مباشر
                 </button>
               </div>
-              <p className="text-stone-500 font-mono text-[10px]" dir="ltr">
-                haithembenzerga@gmail.com (أو admin@adrar-immo.dz)
+              <p className="text-stone-600 font-mono text-[11px] flex items-center gap-2" dir="ltr">
+                <span>email: <strong>rental@adrar01</strong></span>
+                <span>•</span>
+                <span>mot de pass: <strong>123456</strong></span>
               </p>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full mt-1 py-3 bg-[#1E4D38] hover:bg-[#153828] text-white font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              className="w-full mt-1 py-3 bg-[#1E4D38] hover:bg-[#153828] text-white font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50 text-sm"
             >
               {isLoading ? 'جاري التحقق...' : 'دخول'}
             </button>
@@ -238,53 +235,34 @@ export const AuthModal: React.FC = () => {
 
             <div>
               <label className="block font-bold text-stone-700 mb-1">
-                رقم الهاتف الجزائري (مطلوب لحجز الشقة)
+                رقم الهاتف (لحجز الشقة)
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
                   type="tel"
                   dir="ltr"
-                  required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0661234567 أو +213555123456"
-                  className={`w-full pr-9 pl-9 py-2.5 rounded-xl border ${
-                    phone
-                      ? phoneIsValid
-                        ? 'border-emerald-500 bg-emerald-50/20'
-                        : 'border-rose-400 bg-rose-50/20'
-                      : 'border-stone-200'
-                  } focus:outline-none focus:border-[#C85A32] tabular-nums`}
+                  placeholder="0696980328 أو أي رقم هاتف"
+                  className="w-full pr-9 pl-3 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:border-[#C85A32] tabular-nums"
                 />
-                {phone && (
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    {phoneIsValid ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    ) : (
-                      <span className="text-[10px] text-rose-500 font-bold">غير صالح</span>
-                    )}
-                  </div>
-                )}
               </div>
-              <p className="text-[11px] text-stone-400 mt-1">
-                صيغة جزائرية: 05, 06, 07 متبوعة بـ 8 أرقام
-              </p>
             </div>
 
             <div>
               <label className="block font-bold text-stone-700 mb-1">
-                البريد الإلكتروني
+                البريد الإلكتروني أو اسم المستخدم
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
                 <input
-                  type="email"
+                  type="text"
                   dir="ltr"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="example@mail.com"
+                  placeholder="user@mail.com أو rental@adrar01"
                   className="w-full pr-9 pl-3 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:border-[#C85A32]"
                 />
               </div>
@@ -311,7 +289,7 @@ export const AuthModal: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full mt-2 py-3 bg-[#C85A32] hover:bg-[#B24E2A] text-white font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              className="w-full mt-2 py-3 bg-[#C85A32] hover:bg-[#B24E2A] text-white font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50 text-sm"
             >
               {isLoading ? 'جاري إنشاء الحساب...' : 'تأكيد التسجيل'}
             </button>
