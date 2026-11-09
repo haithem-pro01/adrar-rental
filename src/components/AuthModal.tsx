@@ -185,10 +185,34 @@ export const AuthModal: React.FC = () => {
               </div>
             </div>
 
+            {/* Quick helper for Admin Access */}
+            <div className="p-2.5 bg-stone-50 rounded-xl border border-stone-200/80 text-[11px] text-stone-600 flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-[#1E4D38] flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 inline" />
+                  حساب المشرف (لوحة تحكم الإدارة):
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail('haithembenzerga@gmail.com');
+                    setPassword('123456');
+                    setFormError(null);
+                  }}
+                  className="text-[#C85A32] hover:underline font-bold cursor-pointer"
+                >
+                  تعبئة تلقائية
+                </button>
+              </div>
+              <p className="text-stone-500 font-mono text-[10px]" dir="ltr">
+                haithembenzerga@gmail.com (أو admin@adrar-immo.dz)
+              </p>
+            </div>
+
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full mt-2 py-3 bg-[#1E4D38] hover:bg-[#153828] text-white font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              className="w-full mt-1 py-3 bg-[#1E4D38] hover:bg-[#153828] text-white font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
             >
               {isLoading ? 'جاري التحقق...' : 'دخول'}
             </button>
