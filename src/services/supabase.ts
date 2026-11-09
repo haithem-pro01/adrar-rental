@@ -1,15 +1,63 @@
-import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
-import { Apartment, ApartmentStatus, Lease, Municipality, RentalType, Review, UserProfile, UserRole } from '../types';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import {
+  AdrarNeighborhood,
+  Lease,
+  Listing,
+  RentPeriod,
+  UserProfile,
+} from '../types';
 
-export const OFFICIAL_WHATSAPP_NUMBER = '213696980328'; // +213 696980328
+export const OFFICIAL_WHATSAPP_PHONE =
+  import.meta.env.VITE_WHATSAPP_PHONE || '213550472523';
 
-export const AlgerianPhoneRegex = /^(0|\+213)[567][0-9]{8}$/;
+export const ADMIN_PHONE_NUMBERS = [
+  '0550472523',
+  '+213550472523',
+  '213550472523',
+  '0696980328',
+  '+213696980328',
+  '213696980328',
+  '0552069874',
+  '+213552069874',
+  '213552069874',
+];
+
+export const ADRAR_NEIGHBORHOODS: AdrarNeighborhood[] = [
+  'حي السلام',
+  'حي قصر تيليلين',
+  'وسط المدينة',
+  'حي 140 مسكن',
+  'حي المطار',
+  'حي البدر',
+  'حي 20 أوت',
+];
+
+export const AlgerianPhoneRegex = /^(0|\+213|213)[567][0-9]{8}$/;
 
 export function isValidAlgerianPhone(phone: string): boolean {
-  return AlgerianPhoneRegex.test(phone.trim().replace(/\s+/g, ''));
+  if (!phone) return false;
+  const clean = phone.trim().replace(/[\s-]/g, '');
+  return AlgerianPhoneRegex.test(clean);
 }
 
-// Safely read Supabase environment variables
+export function normalizeAlgerianPhone(phone: string): string {
+  const clean = phone.trim().replace(/[\s-]/g, '');
+  if (clean.startsWith('+213')) return '0' + clean.substring(4);
+  if (clean.startsWith('213')) return '0' + clean.substring(3);
+  return clean;
+}
+
+export function isAdminPhoneNumber(phone: string): boolean {
+  if (!phone) return false;
+  const clean = phone.trim().replace(/[\s-]/g, '');
+  const normalized = normalizeAlgerianPhone(clean);
+  return ADMIN_PHONE_NUMBERS.some((adm) => {
+    const admNorm = normalizeAlgerianPhone(adm);
+    return admNorm === normalized || clean.endsWith('550472523') || clean.endsWith('696980328') || clean.endsWith('552069874');
+  });
+}
+
+// Supabase client initialization
 const supabaseUrl =
   import.meta.env.VITE_SUPABASE_URL || 'https://afqwgpcbvissovuirihh.supabase.co';
 const supabaseAnonKey =
@@ -22,485 +70,501 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
   },
 });
 
-// Seed data for initial Adrar listings if remote DB is empty
-const INITIAL_ADRAR_LISTINGS: Apartment[] = [
+// Seed Initial Listings for Adrar Centre matching the Luxury MacBook UI Mockup
+export const INITIAL_LISTINGS: Listing[] = [
   {
-    id: 'apt-adr-1',
-    code: 'ADR-1042',
-    title: 'شقة فاخرة بإطلالة واحات النخيل - وسط مدينة أدرار',
-    description: 'شقة مفروشة عصرية واسعة F4 مع صالون صحراوي فسيح، نوافذ عازلة للحرارة، مطبخ إيطالي مجهز بالكامل، خزان ماء سعة 2500 لتر، ونظام تكييف متطور.',
-    municipality: 'أدرار',
-    address: 'حي 140 مسكن، قرب ساحة الشهداء، أدرار وسط',
-    rental_type: 'both',
-    monthly_price: 55000,
-    yearly_price: 600000,
-    rooms: 4,
+    id: 'zayd-apt-1',
+    ref_code: 'ADR-1042',
+    title_ar: 'شقة ملكية عصرية F4 مع إطلالة بانورامية - حي السلام',
+    title_fr: 'Appartement Royal Moderne F4 Vue Panoramique - Cité Es-Salam',
+    description_ar: 'شقة فاخرة مفروشة بأحدث الأثاث الإيطالي، صالون ملكي فسيح، نظام تكييف مركزي متكيف مع مناخ أدرار، مطبخ مجهز بالكامل، وخزان ماء 3000 لتر مع مضخة ضغط.',
+    description_fr: 'Appartement de luxe entièrement meublé, grand salon marocain et moderne, climatisation intégrale, cuisine équipée et bâche à eau de 3000L.',
+    neighborhood: 'حي السلام',
+    property_type: 'apartment',
+    bedrooms: 3,
     bathrooms: 2,
-    area: 145,
-    floor: 'الطابق الثاني',
-    amenities: [
-      'مكيفات صحراوية وهوائية',
-      'خزان ماء 2500 لتر مع مضخة',
-      'أنترنت ألياف بصرية فائقة السرعة',
-      'مطبخ مجهز بالكامل',
-      'موقف سيارات محروس',
-      'شرفة واسعة مطلة',
-    ],
+    living_rooms: 1,
+    area_m2: 120,
+    price_night: 15000,
+    price_month: 45000,
+    price_year: 520000,
+    contact_whatsapp: '213550472523',
+    status: 'available',
+    image_url: '/images/apartment_adrar_modern_1_1794234918725.jpg',
     images: [
       '/images/apartment_adrar_modern_1_1794234918725.jpg',
       '/images/hero_adrar_luxury_1794234917435.jpg',
       '/images/apartment_reggane_suite_1794234919330.jpg',
     ],
-    status: 'available',
+    amenities: ['تكييف هوائي وصحراوي', 'خزان ماء 3000 لتر', 'أنترنت ألياف بصرية', 'موقف محروس'],
     created_at: new Date().toISOString(),
   },
   {
-    id: 'apt-adr-2',
-    code: 'ADR-2088',
-    title: 'إقامة الواحة الحمراء - قصر تيميمون التراثي الفاخر',
-    description: 'تحفة معمارية بطراز القصور الصحراوية بقورارة تيميمون، شرفة ملكية مطلة مباشرة على غابات النخيل والكثبان الذهبية، أثاث راقٍ وجلسات أندلسية أصيلة.',
-    municipality: 'تيميمون',
-    address: 'طريق القصور، قبالة واحة النخيل، تيميمون',
-    rental_type: 'both',
-    monthly_price: 75000,
-    yearly_price: 820000,
-    rooms: 5,
-    bathrooms: 2,
-    area: 190,
-    floor: 'فيلا أرضية بطابق علوي',
-    amenities: [
-      'تراس بانورامي على الواحة',
-      'مكيفات حديثة في كل الغرف',
-      'بئر ارتوازي وخزان ماء خاص',
-      'حديقة داخلية بنخيل مثمر',
-      'صالون تقليدي مفروش بالزرابي الصحراوية',
-    ],
-    images: [
-      '/images/apartment_timimoun_palmeraie_1794234919292.jpg',
-      '/images/hero_adrar_luxury_1794234917435.jpg',
-    ],
-    status: 'available',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'apt-adr-3',
-    code: 'ADR-3105',
-    title: 'شقة راقية مؤثثة F3 - وسط بلدية رقان',
-    description: 'شقة حديثة البناء في موقع استراتيجي هادئ برقان، قريبة من كافة الإدارات، مجهزة بأحدث أدوات الراحة وعوازل حرارية ممتازة مناسبة لمهندسي وإطارات الشركات.',
-    municipality: 'رقان',
-    address: 'حي النصر الجديد، بجانب المجمع الإداري، رقان',
-    rental_type: 'monthly',
-    monthly_price: 42000,
-    yearly_price: 480000,
-    rooms: 3,
-    bathrooms: 1,
-    area: 110,
-    floor: 'الطابق الأول',
-    amenities: [
-      'مكيفات سبليت قوية التبريد',
-      'خزان ماء 2000 لتر',
-      'أثاث جديد لم يستعمل',
-      'تلفاز ذكي 55 بوصة مع اشتراك إنترنت',
-    ],
-    images: [
-      '/images/apartment_reggane_suite_1794234919330.jpg',
-      '/images/apartment_adrar_modern_1_1794234918725.jpg',
-    ],
-    status: 'available',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'apt-adr-4',
-    code: 'ADR-4190',
-    title: 'دوبلكس سياحي راقٍ ببلدية فنوغيل الهادئة',
-    description: 'دوبلكس حديث بطابع معماري جنوبي أصيل، فناء مشمس، مساحات مفتوحة، مثالي للعائلات الكبيرة والباحثين عن الهدوء والسكينة على بعد 15 دقيقة من أدرار.',
-    municipality: 'فنوغيل',
-    address: 'المدخل الشمالي لبلدية فنوغيل، قرب قصر بوعلي',
-    rental_type: 'yearly',
-    monthly_price: 48000,
-    yearly_price: 520000,
-    rooms: 4,
-    bathrooms: 2,
-    area: 160,
-    floor: 'دوبلكس (أرضي + أول)',
-    amenities: [
-      'عزل حراري مزدوج',
-      'خزان ماء 3000 لتر أرضي وعلوي',
-      'مطبخ ريفي صحراوي واسع',
-      'فناء داخلي مشجر',
-    ],
-    images: [
-      '/images/hero_adrar_luxury_1794234917435.jpg',
-      '/images/apartment_timimoun_palmeraie_1794234919292.jpg',
-    ],
-    status: 'available',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'apt-adr-5',
-    code: 'ADR-5221',
-    title: 'شقة استوديو فاخرة للموظفين والإطارات - تسابيت',
-    description: 'استوديو مودرن F2 مفروش بأناقة عالية، مثالي للإطارات وأساتذة الجامعة والموظفين المنتدبين، تجهيز كهربائي كامل ونظام تهوية صحراوي اقتصادي.',
-    municipality: 'تسابيت',
-    address: 'الشارع الرئيسي، حي المستقبل، بلدية تسابيت',
-    rental_type: 'monthly',
-    monthly_price: 32000,
-    yearly_price: 350000,
-    rooms: 2,
-    bathrooms: 1,
-    area: 75,
-    floor: 'الطابق الأرضي',
-    amenities: [
-      'مكيف تبريد وتدفئة',
-      'خزان ماء مستقل',
-      'ثلاجة وغسالة وميكروويف',
-      'إنترنت لا سلكي 4G مجاني',
-    ],
-    images: [
-      '/images/apartment_adrar_modern_1_1794234918725.jpg',
-      '/images/apartment_reggane_suite_1794234919330.jpg',
-    ],
-    status: 'available',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'apt-adr-6',
-    code: 'ADR-6310',
-    title: 'فيلا عائلية شاسعة مع حديقة نخيل - زاوية كنتة',
-    description: 'فيلا فخمة متكاملة بطراز معماري أصيل بزاوية كنتة التاريخية، صالونات ضيوف متعددة، غرف نوم رحبة، خزان ماء ضخم وبئر ماء عذب، مثالية للسكن السنوي طويل الأمد.',
-    municipality: 'زاوية كنتة',
-    address: 'حي القصبة العتيقة، زاوية كنتة',
-    rental_type: 'yearly',
-    monthly_price: 65000,
-    yearly_price: 720000,
-    rooms: 6,
+    id: 'zayd-apt-2',
+    ref_code: 'ADR-2088',
+    title_ar: 'فيلا قصر التيليلين الفاخرة - حدائق داخلية ومسبح خاص',
+    title_fr: 'Villa Palais Tililine de Prestige - Jardins et Piscine Privée',
+    description_ar: 'تحفة معمارية بطراز القصور الصحراوية الراقية بقصر تيليلين بأدرار، جلسات شاي أندلسية، صالونات استقبال متعددة، مسبح خاص مظلل، وعوازل حرارية مزدوجة.',
+    description_fr: 'Splendide villa d’architecte à Tililine, salons de réception prestigieux, piscine privative ombragée, suite parentale et climatisation renforcée.',
+    neighborhood: 'حي قصر تيليلين',
+    property_type: 'villa',
+    bedrooms: 5,
     bathrooms: 3,
-    area: 250,
-    floor: 'طابقين مستقلين',
-    amenities: [
-      'حديقة ونخيل مثمر',
-      'بئر ماء عذب + خزان 5000 لتر',
-      'مكيفات مركزية',
-      'مرآب يتسع لثلاث سيارات',
-    ],
+    living_rooms: 2,
+    area_m2: 260,
+    price_night: 28000,
+    price_month: 85000,
+    price_year: 980000,
+    contact_whatsapp: '213550472523',
+    status: 'available',
+    image_url: '/images/hero_adrar_luxury_1794234917435.jpg',
     images: [
       '/images/hero_adrar_luxury_1794234917435.jpg',
       '/images/apartment_timimoun_palmeraie_1794234919292.jpg',
     ],
+    amenities: ['مسبح خاص', 'صالونات متعددة', 'بئر ماء عذب', 'مرآب سيارات يتسع لـ 3 سيارات'],
+    created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+  },
+  {
+    id: 'zayd-apt-3',
+    ref_code: 'ADR-3105',
+    title_ar: 'شقة إدارية راقية F3 للإطارات والشركات - وسط المدينة',
+    title_fr: 'Suite Résidentielle F3 Cadres & Entreprises - Centre-Ville',
+    description_ar: 'شقة عصرية هادئة جداً قرب مقر ولاية أدرار والإدارات الرئيسية، أثاث مكتبي وسكني متكامل، شاشات ذكية 4K، مطبخ أمريكي مفتوح، وإنترنت سريع.',
+    description_fr: 'Appartement meublé idéal pour cadres et missions professionnelles, proche des administrations de la Wilaya d’Adrar, fibre optique et calme absolu.',
+    neighborhood: 'وسط المدينة',
+    property_type: 'apartment',
+    bedrooms: 2,
+    bathrooms: 2,
+    living_rooms: 1,
+    area_m2: 95,
+    price_night: 12000,
+    price_month: 38000,
+    price_year: 440000,
+    contact_whatsapp: '213550472523',
     status: 'available',
-    created_at: new Date().toISOString(),
+    image_url: '/images/apartment_reggane_suite_1794234919330.jpg',
+    images: [
+      '/images/apartment_reggane_suite_1794234919330.jpg',
+      '/images/apartment_adrar_modern_1_1794234918725.jpg',
+    ],
+    amenities: ['موقع استراتيجي', 'أثاث جديد 100%', 'تلفاز 55 بوصة', 'غسالة ومجفف ملابس'],
+    created_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
+  },
+  {
+    id: 'zayd-apt-4',
+    ref_code: 'ADR-4190',
+    title_ar: 'شقة عائلية مؤثثة F4 مع فناء مشمس - حي 140 مسكن',
+    title_fr: 'Appartement Familial Meublé F4 - Cité 140 Logements',
+    description_ar: 'شقة أرضية فسيحة بحي 140 مسكن الراقي، مدخل مستقل، فناء واسع، خزانات مياه سعة 4000 لتر، ومكيفات سبليت في كل الغرف والصالون.',
+    description_fr: 'Appartement spacieux au rez-de-chaussée avec cour privative, réservoirs de 4000L, climatisation split dans toutes les pièces.',
+    neighborhood: 'حي 140 مسكن',
+    property_type: 'apartment',
+    bedrooms: 3,
+    bathrooms: 2,
+    living_rooms: 1,
+    area_m2: 135,
+    price_night: 16000,
+    price_month: 48000,
+    price_year: 540000,
+    contact_whatsapp: '213550472523',
+    status: 'available',
+    image_url: '/images/apartment_timimoun_palmeraie_1794234919292.jpg',
+    images: [
+      '/images/apartment_timimoun_palmeraie_1794234919292.jpg',
+      '/images/apartment_adrar_modern_1_1794234918725.jpg',
+    ],
+    amenities: ['فناء مستقل', 'خزان 4000 لتر', 'قريب من المدارس والخدمات', 'أمان عالي'],
+    created_at: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
+  },
+  {
+    id: 'zayd-apt-5',
+    ref_code: 'ADR-5221',
+    title_ar: 'دوبلكس راقٍ مع تيراس مفتوح - حي المطار الجديد',
+    title_fr: 'Duplex Haut Standing avec Terrasse - Cité Aéroport',
+    description_ar: 'دوبلكس فاخر بتصميم عصري مفتوح، إطلالة رائعة على سماء أدرار الصافية، غرف نوم رحبة، وحي راقٍ وهادئ مناسب للعائلات والإطارات السامية.',
+    description_fr: 'Duplex moderne avec terrasse panoramique, quartier résidentiel paisible proche de l’aéroport Touat Cheikh Sidi Mohamed Belkebir.',
+    neighborhood: 'حي المطار',
+    property_type: 'duplex',
+    bedrooms: 4,
+    bathrooms: 2,
+    living_rooms: 2,
+    area_m2: 175,
+    price_night: 20000,
+    price_month: 60000,
+    price_year: 680000,
+    contact_whatsapp: '213550472523',
+    status: 'available',
+    image_url: '/images/hero_adrar_luxury_1794234917435.jpg',
+    images: [
+      '/images/hero_adrar_luxury_1794234917435.jpg',
+      '/images/apartment_reggane_suite_1794234919330.jpg',
+    ],
+    amenities: ['تيراس واسع', 'صالونين مستقلين', 'نظام عزل صوتي وحراري', 'مطبخ إيطالي'],
+    created_at: new Date(Date.now() - 96 * 3600 * 1000).toISOString(),
+  },
+  {
+    id: 'zayd-apt-6',
+    ref_code: 'ADR-6310',
+    title_ar: 'إقامة النخيل الفاخرة F3 - حي البدر الهادئ',
+    title_fr: 'Résidence Les Palmiers F3 - Cité El-Badr',
+    description_ar: 'شقة فاخرة مجهزة حديثاً في موقع هادئ بحي البدر، ديكور شرقي صحراوي راقٍ، صالون فسيح مع جلسات مريحة وتجهيز متكامل للإقامة القصيرة والطويلة.',
+    description_fr: 'Appartement décoré avec raffinement saharien et moderne, ambiance chaleureuse, parfait pour séjours professionnels ou vacances en famille.',
+    neighborhood: 'حي البدر',
+    property_type: 'apartment',
+    bedrooms: 2,
+    bathrooms: 1,
+    living_rooms: 1,
+    area_m2: 100,
+    price_night: 13000,
+    price_month: 42000,
+    price_year: 480000,
+    contact_whatsapp: '213550472523',
+    status: 'available',
+    image_url: '/images/apartment_adrar_modern_1_1794234918725.jpg',
+    images: ['/images/apartment_adrar_modern_1_1794234918725.jpg'],
+    amenities: ['أثاث فاخر', 'هدوء تام', 'تكييف في كل الغرف', 'إنترنت 4G مجاني'],
+    created_at: new Date(Date.now() - 120 * 3600 * 1000).toISOString(),
   },
 ];
 
-// Seed verified initial tenants and users for Adrar platform
-// Roles: Admin = 1, Customers/Tenants = 0
-// KYC Status: 'unverified' | 'pending' | 'verified' | 'rejected'
-export const INITIAL_PROFILES: UserProfile[] = [
+// Seed Initial Leases for Expiry Alerts demonstrations
+export const INITIAL_LEASES: Lease[] = [
   {
-    id: 'user-admin-1',
-    email: 'rental@adrar01',
-    full_name: 'مدير المنصة (rental@adrar01)',
-    phone: '0696980328',
-    role: 'admin',
-    role_code: 1,
-    is_active: true,
-    is_verified: true,
-    kyc_status: 'verified',
-    id_card_type: 'بطاقة التعريف الوطنية البيومترية',
-    id_card_number: '109847291039',
-    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    id: 'lease-exp-1',
+    listing_id: 'zayd-apt-1',
+    tenant_name: 'أحمد بن مبارك (إطار شركة سونلغاز)',
+    tenant_phone: '0661234567',
+    period_type: 'night',
+    agreed_price: 15000,
+    start_date: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString().split('T')[0],
+    end_date: new Date(Date.now() + 18 * 3600 * 1000).toISOString().split('T')[0], // Expires in < 24 hours!
+    status: 'expiring_soon',
+    listing_title: 'شقة ملكية عصرية F4 مع إطلالة بانورامية - حي السلام',
+    listing_ref: 'ADR-1042',
+    neighborhood: 'حي السلام',
+    notes: 'إقامة يومية لوفد مهندسين، تنتهي غداً صباحاً.',
+    created_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
   },
   {
-    id: 'user-admin-2',
-    email: 'haithembenzerga@gmail.com',
-    full_name: 'هيثم بن زرقة (المشرف العام)',
-    phone: '0696980328',
-    role: 'admin',
-    role_code: 1,
-    is_active: true,
-    is_verified: true,
-    kyc_status: 'verified',
-    id_card_type: 'بطاقة التعريف الوطنية البيومترية',
-    id_card_number: '110293847562',
-    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
+    id: 'lease-exp-2',
+    listing_id: 'zayd-apt-3',
+    tenant_name: 'سليمان التواتي (مهندس معماري)',
+    tenant_phone: '0696980328',
+    period_type: 'month',
+    agreed_price: 38000,
+    start_date: new Date(Date.now() - 25 * 24 * 3600 * 1000).toISOString().split('T')[0],
+    end_date: new Date(Date.now() + 4 * 24 * 3600 * 1000).toISOString().split('T')[0], // Expires in 4 days (< 7 days!)
+    status: 'expiring_soon',
+    listing_title: 'شقة إدارية راقية F3 للإطارات والشركات - وسط المدينة',
+    listing_ref: 'ADR-3105',
+    neighborhood: 'وسط المدينة',
+    notes: 'عقد شهري، المستأجر يرغب في التجديد.',
+    created_at: new Date(Date.now() - 25 * 24 * 3600 * 1000).toISOString(),
   },
   {
-    id: 'user-past-1',
-    email: 'souleymane.touati@yahoo.fr',
-    full_name: 'سليمان التواتي (مهندس منتدب)',
-    phone: '0661234567',
-    role: 'tenant',
-    role_code: 0,
-    is_active: true,
-    is_verified: true,
-    kyc_status: 'verified',
-    id_card_type: 'بطاقة التعريف الوطنية البيومترية',
-    id_card_number: '114829104820',
-    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'user-past-2',
-    email: 'noureddine.belkheir@gmail.com',
-    full_name: 'نور الدين بلخضر',
-    phone: '0550123456',
-    role: 'tenant',
-    role_code: 0,
-    is_active: true,
-    is_verified: true,
-    kyc_status: 'verified',
-    id_card_type: 'رخصة السياقة البيومترية',
-    id_card_number: '01/492810',
-    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'user-client-1',
-    email: 'karim.laroussi@gmail.com',
-    full_name: 'كريم لعروسي (عميل بانتظار المراجعة)',
-    phone: '0770987654',
-    role: 'client',
-    role_code: 0,
-    is_active: false,
-    is_verified: false,
-    kyc_status: 'pending',
-    id_card_type: 'بطاقة التعريف الوطنية البيومترية',
-    id_card_number: '120938475619',
-    id_card_front: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    id_card_back: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    id_card_image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80',
-    kyc_submitted_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'user-client-2',
-    email: 'yassine.adrar@gmail.com',
-    full_name: 'ياسين بن علي (حساب غير مفعل)',
-    phone: '0665432109',
-    role: 'client',
-    role_code: 0,
-    is_active: false,
-    is_verified: false,
-    kyc_status: 'unverified',
-    created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    id: 'lease-exp-3',
+    listing_id: 'zayd-apt-4',
+    tenant_name: 'نور الدين بلخضر',
+    tenant_phone: '0550123456',
+    period_type: 'year',
+    agreed_price: 540000,
+    start_date: new Date(Date.now() - 345 * 24 * 3600 * 1000).toISOString().split('T')[0],
+    end_date: new Date(Date.now() + 20 * 24 * 3600 * 1000).toISOString().split('T')[0], // Expires in 20 days (< 30 days!)
+    status: 'expiring_soon',
+    listing_title: 'شقة عائلية مؤثثة F4 مع فناء مشمس - حي 140 مسكن',
+    listing_ref: 'ADR-4190',
+    neighborhood: 'حي 140 مسكن',
+    notes: 'عقد سنوي عائلي يقترب من موعد التجديد.',
+    created_at: new Date(Date.now() - 345 * 24 * 3600 * 1000).toISOString(),
   },
 ];
 
-// Automatically seeds admin and initial users into Supabase Auth & Database
-export async function seedAdminAndInitialUsersInSupabase(): Promise<void> {
-  try {
-    // 1. Register haithembenzerga@gmail.com in Supabase Auth (role_code: 1)
-    try {
-      await supabase.auth.signUp({
-        email: 'haithembenzerga@gmail.com',
-        password: 'Password123!',
-        options: {
-          data: {
-            full_name: 'هيثم بن زرقة (المشرف العام)',
-            phone: '0696980328',
-            role: 'admin',
-            role_code: 1,
-          },
-        },
-      });
-    } catch (e) {
-      console.warn('Seed haithembenzerga auth note:', e);
-    }
+// Local Storage Keys
+const STORAGE_KEY_LISTINGS = 'zayd_live_listings';
+const STORAGE_KEY_LEASES = 'zayd_live_leases';
+const STORAGE_KEY_PROFILES = 'zayd_live_profiles';
 
-    // 2. Register rental@adrar-immo.dz in Supabase Auth (role_code: 1)
-    try {
-      await supabase.auth.signUp({
-        email: 'rental@adrar-immo.dz',
-        password: 'Password123!',
-        options: {
-          data: {
-            full_name: 'مدير المنصة (rental@adrar01)',
-            phone: '0696980328',
-            role: 'admin',
-            role_code: 1,
-          },
-        },
-      });
-    } catch (e) {
-      console.warn('Seed rental auth note:', e);
-    }
-
-    // 3. Upsert profiles to Supabase profiles table
-    for (const prof of INITIAL_PROFILES) {
-      try {
-        await supabase.from('profiles').upsert(prof);
-      } catch (err) {
-        console.warn('Seed profile DB note:', err);
-      }
-    }
-  } catch (err) {
-    console.warn('seedAdminAndInitialUsersInSupabase general note:', err);
-  }
-}
-
-// Local store fallback keys
-const STORAGE_KEY_LISTINGS = 'adrar_live_listings';
-const STORAGE_KEY_LEASES = 'adrar_live_leases';
-const STORAGE_KEY_PROFILES = 'adrar_live_profiles';
-
-// Client-side image compression utility for fast uploads
-export async function compressImageToDataUrl(
-  file: File,
-  maxWidth = 1280,
-  maxHeight = 1280,
-  quality = 0.82
-): Promise<{ dataUrl: string; blob: Blob }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-        if (width > maxWidth || height > maxHeight) {
-          if (width > height) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          } else {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          const fallback = (e.target?.result as string) || '';
-          resolve({ dataUrl: fallback, blob: file });
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        canvas.toBlob(
-          (blob) => {
-            resolve({ dataUrl, blob: blob || file });
-          },
-          'image/jpeg',
-          quality
-        );
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-// Uploads KYC document to Supabase Storage bucket 'kyc-documents'
-// with automatic fallback to compressed high-quality dataUrl
-export async function uploadKycDocument(
-  userId: string,
-  file: File,
-  side: 'front' | 'back'
-): Promise<string> {
-  try {
-    const { dataUrl, blob } = await compressImageToDataUrl(file);
-    const fileName = `${userId}/id_${side}_${Date.now()}.jpg`;
-
-    const { data, error } = await supabase.storage
-      .from('kyc-documents')
-      .upload(fileName, blob, {
-        contentType: 'image/jpeg',
-        upsert: true,
-      });
-
-    if (!error && data?.path) {
-      const { data: publicUrlData } = supabase.storage
-        .from('kyc-documents')
-        .getPublicUrl(data.path);
-      if (publicUrlData?.publicUrl) {
-        return publicUrlData.publicUrl;
-      }
-    }
-
-    return dataUrl;
-  } catch (err) {
-    console.warn('uploadKycDocument fallback note:', err);
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
-  }
-}
-
+// Database Service with Supabase + Local Cache Sync
 export const dbService = {
-  // --- PROFILES ---
-  async getProfile(userId: string): Promise<UserProfile | null> {
+  // =================== LISTINGS ===================
+  async getListings(): Promise<Listing[]> {
+    let list: Listing[] = [];
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (!error && data) {
-        return data as UserProfile;
-      }
-    } catch (err) {
-      console.warn('Supabase getProfile error:', err);
-    }
-
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
-      if (stored) {
-        const list: UserProfile[] = JSON.parse(stored);
-        const found = list.find((p) => p.id === userId);
-        if (found) return found;
-      }
-    }
-
-    return null;
-  },
-
-  async getAllProfiles(): Promise<UserProfile[]> {
-    let list: UserProfile[] = [];
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
+        .from('listings')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        list = data as UserProfile[];
+        list = data.map((item) => ({
+          id: item.id,
+          ref_code: item.ref_code,
+          title_ar: item.title_ar,
+          title_fr: item.title_fr || item.title_ar,
+          neighborhood: item.neighborhood,
+          property_type: item.property_type || 'apartment',
+          bedrooms: item.bedrooms || 3,
+          bathrooms: item.bathrooms || 2,
+          living_rooms: item.living_rooms || 1,
+          area_m2: item.area_m2 || 120,
+          price_night: Number(item.price_night || 0),
+          price_month: Number(item.price_month || 0),
+          price_year: Number(item.price_year || 0),
+          contact_whatsapp: item.contact_whatsapp || OFFICIAL_WHATSAPP_PHONE,
+          status: item.status || 'available',
+          image_url: item.image_url || '/images/apartment_adrar_modern_1_1794234918725.jpg',
+          images: item.images || [item.image_url],
+          amenities: item.amenities || [],
+          created_at: item.created_at || new Date().toISOString(),
+        }));
       }
     } catch (err) {
-      console.warn('Supabase getAllProfiles error:', err);
+      console.warn('Supabase getListings note:', err);
     }
 
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
-      let localList: UserProfile[] = stored ? JSON.parse(stored) : INITIAL_PROFILES;
+      const stored = localStorage.getItem(STORAGE_KEY_LISTINGS);
+      let localList: Listing[] = stored ? JSON.parse(stored) : INITIAL_LISTINGS;
       if (!stored) {
-        localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(INITIAL_PROFILES));
+        localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(INITIAL_LISTINGS));
       }
 
-      // Merge remote list with local cache so accounts NEVER disappear
-      const map = new Map<string, UserProfile>();
-      list.forEach((p) => map.set(p.email.toLowerCase(), p));
-      localList.forEach((p) => {
-        if (!map.has(p.email.toLowerCase())) {
-          map.set(p.email.toLowerCase(), p);
+      const map = new Map<string, Listing>();
+      list.forEach((l) => map.set(l.id, l));
+      localList.forEach((l) => {
+        if (!map.has(l.id)) {
+          map.set(l.id, l);
         }
       });
       list = Array.from(map.values());
     }
 
     if (list.length === 0) {
-      list = INITIAL_PROFILES;
+      list = INITIAL_LISTINGS;
+    }
+
+    return list;
+  },
+
+  async saveListing(listing: Listing): Promise<Listing> {
+    try {
+      await supabase.from('listings').upsert({
+        id: listing.id,
+        ref_code: listing.ref_code,
+        title_ar: listing.title_ar,
+        title_fr: listing.title_fr,
+        neighborhood: listing.neighborhood,
+        property_type: listing.property_type,
+        bedrooms: listing.bedrooms,
+        bathrooms: listing.bathrooms,
+        living_rooms: listing.living_rooms,
+        area_m2: listing.area_m2,
+        price_night: listing.price_night,
+        price_month: listing.price_month,
+        price_year: listing.price_year,
+        contact_whatsapp: listing.contact_whatsapp,
+        status: listing.status,
+        image_url: listing.image_url,
+      });
+    } catch (err) {
+      console.warn('Supabase saveListing note:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_LISTINGS);
+      let list: Listing[] = stored ? JSON.parse(stored) : [...INITIAL_LISTINGS];
+      const idx = list.findIndex((l) => l.id === listing.id);
+      if (idx >= 0) {
+        list[idx] = listing;
+      } else {
+        list.unshift(listing);
+      }
+      localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(list));
+    }
+
+    return listing;
+  },
+
+  async deleteListing(listingId: string): Promise<void> {
+    try {
+      await supabase.from('listings').delete().eq('id', listingId);
+    } catch (err) {
+      console.warn('Supabase deleteListing note:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_LISTINGS);
+      if (stored) {
+        let list: Listing[] = JSON.parse(stored);
+        list = list.filter((l) => l.id !== listingId);
+        localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(list));
+      }
+    }
+  },
+
+  // =================== LEASES & EXPIRIES ===================
+  async getLeases(): Promise<Lease[]> {
+    let list: Lease[] = [];
+    try {
+      const { data, error } = await supabase
+        .from('leases')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        list = data as Lease[];
+      }
+    } catch (err) {
+      console.warn('Supabase getLeases note:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_LEASES);
+      let localList: Lease[] = stored ? JSON.parse(stored) : INITIAL_LEASES;
+      if (!stored) {
+        localStorage.setItem(STORAGE_KEY_LEASES, JSON.stringify(INITIAL_LEASES));
+      }
+
+      const map = new Map<string, Lease>();
+      list.forEach((l) => map.set(l.id, l));
+      localList.forEach((l) => {
+        if (!map.has(l.id)) {
+          map.set(l.id, l);
+        }
+      });
+      list = Array.from(map.values());
+    }
+
+    if (list.length === 0) {
+      list = INITIAL_LEASES;
+    }
+
+    return list;
+  },
+
+  async createLease(leaseData: Omit<Lease, 'id' | 'created_at'>): Promise<Lease> {
+    const newLease: Lease = {
+      ...leaseData,
+      id: `lease-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      await supabase.from('leases').insert([
+        {
+          id: newLease.id,
+          listing_id: newLease.listing_id,
+          tenant_name: newLease.tenant_name,
+          tenant_phone: newLease.tenant_phone,
+          period_type: newLease.period_type,
+          agreed_price: newLease.agreed_price,
+          start_date: newLease.start_date,
+          end_date: newLease.end_date,
+          status: newLease.status,
+        },
+      ]);
+
+      // Automatically update property status to 'rented'
+      await supabase
+        .from('listings')
+        .update({ status: 'rented' })
+        .eq('id', newLease.listing_id);
+    } catch (err) {
+      console.warn('Supabase createLease note:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const storedLeases = localStorage.getItem(STORAGE_KEY_LEASES);
+      let leases: Lease[] = storedLeases ? JSON.parse(storedLeases) : [...INITIAL_LEASES];
+      leases.unshift(newLease);
+      localStorage.setItem(STORAGE_KEY_LEASES, JSON.stringify(leases));
+
+      // Also mark property rented locally
+      const storedListings = localStorage.getItem(STORAGE_KEY_LISTINGS);
+      if (storedListings) {
+        let listings: Listing[] = JSON.parse(storedListings);
+        const idx = listings.findIndex((l) => l.id === newLease.listing_id);
+        if (idx >= 0) {
+          listings[idx].status = 'rented';
+          localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(listings));
+        }
+      }
+    }
+
+    return newLease;
+  },
+
+  async updateLease(leaseId: string, updates: Partial<Lease>): Promise<void> {
+    try {
+      await supabase.from('leases').update(updates).eq('id', leaseId);
+    } catch (err) {
+      console.warn('Supabase updateLease note:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_LEASES);
+      if (stored) {
+        let list: Lease[] = JSON.parse(stored);
+        const idx = list.findIndex((l) => l.id === leaseId);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], ...updates };
+          localStorage.setItem(STORAGE_KEY_LEASES, JSON.stringify(list));
+        }
+      }
+    }
+  },
+
+  async deleteLease(leaseId: string): Promise<void> {
+    try {
+      await supabase.from('leases').delete().eq('id', leaseId);
+    } catch (err) {
+      console.warn('Supabase deleteLease note:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_LEASES);
+      if (stored) {
+        let list: Lease[] = JSON.parse(stored);
+        list = list.filter((l) => l.id !== leaseId);
+        localStorage.setItem(STORAGE_KEY_LEASES, JSON.stringify(list));
+      }
+    }
+  },
+
+  async getTenantActiveLease(phone: string): Promise<Lease | null> {
+    if (!phone) return null;
+    const leases = await this.getLeases();
+    const clean = normalizeAlgerianPhone(phone);
+    const found = leases.find((l) => {
+      const lClean = normalizeAlgerianPhone(l.tenant_phone);
+      return (lClean === clean || l.tenant_phone.includes(clean)) && l.status !== 'ended';
+    });
+    return found || null;
+  },
+
+  // =================== PROFILES & AUTH ===================
+  async getProfiles(): Promise<UserProfile[]> {
+    let list: UserProfile[] = [];
+    try {
+      const { data, error } = await supabase.from('profiles').select('*');
+      if (!error && data) {
+        list = data as UserProfile[];
+      }
+    } catch (err) {
+      console.warn('Supabase getProfiles note:', err);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
+      let localList: UserProfile[] = stored ? JSON.parse(stored) : [];
+      const map = new Map<string, UserProfile>();
+      list.forEach((p) => map.set(normalizeAlgerianPhone(p.phone), p));
+      localList.forEach((p) => {
+        const norm = normalizeAlgerianPhone(p.phone);
+        if (!map.has(norm)) map.set(norm, p);
+      });
+      list = Array.from(map.values());
     }
 
     return list;
@@ -510,17 +574,16 @@ export const dbService = {
     try {
       await supabase.from('profiles').upsert(profile);
     } catch (err) {
-      console.warn('Supabase saveProfile error:', err);
+      console.warn('Supabase saveProfile note:', err);
     }
 
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
-      let profiles: UserProfile[] = stored ? JSON.parse(stored) : [...INITIAL_PROFILES];
-      const idx = profiles.findIndex(
-        (p) => p.email.toLowerCase() === profile.email.toLowerCase() || p.id === profile.id
-      );
-      if (idx !== -1) {
-        profiles[idx] = { ...profiles[idx], ...profile };
+      let profiles: UserProfile[] = stored ? JSON.parse(stored) : [];
+      const norm = normalizeAlgerianPhone(profile.phone);
+      const idx = profiles.findIndex((p) => normalizeAlgerianPhone(p.phone) === norm);
+      if (idx >= 0) {
+        profiles[idx] = profile;
       } else {
         profiles.unshift(profile);
       }
@@ -528,526 +591,106 @@ export const dbService = {
     }
   },
 
-  async updateProfileRoleAndStatus(
-    userId: string,
-    updates: Partial<Pick<UserProfile, 'role' | 'is_active' | 'phone' | 'full_name'>>
-  ): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', userId);
+  // =================== WHATSAPP GENERATOR ===================
+  formatWhatsAppUrl(
+    listing: Listing,
+    period: RentPeriod = 'month',
+    user?: UserProfile | null
+  ): string {
+    const periodLabelAr =
+      period === 'night' ? 'يومي' : period === 'year' ? 'سنوي' : 'شهري';
+    const price =
+      period === 'night'
+        ? `${listing.price_night.toLocaleString('fr-DZ')} د.ج / يوم`
+        : period === 'year'
+        ? `${listing.price_year.toLocaleString('fr-DZ')} د.ج / سنة`
+        : `${listing.price_month.toLocaleString('fr-DZ')} د.ج / شهر`;
 
-      if (error) console.warn('Supabase updateProfile error:', error);
-    } catch (err) {
-      console.warn('Supabase updateProfile error:', err);
-    }
+    const senderInfo = user ? `، أنا ${user.full_name}` : '';
 
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
-      if (stored) {
-        const profiles: UserProfile[] = JSON.parse(stored);
-        const idx = profiles.findIndex((p) => p.id === userId);
-        if (idx !== -1) {
-          profiles[idx] = { ...profiles[idx], ...updates };
-          localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
-        }
-      }
-    }
+    const message = `السلام عليكم وكالة زيد العقارية${senderInfo}، أنا مهتم بكراء: [${listing.title_ar}] (كود: [${listing.ref_code}]) في [${listing.neighborhood}] بأدرار، نوع الكراء: [${periodLabelAr}] بسعر [${price}]. هل الشقة متوفرة للمعاينة؟`;
 
-    return true;
+    const targetPhone = listing.contact_whatsapp || OFFICIAL_WHATSAPP_PHONE;
+    const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
+
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
   },
 
-  async submitKycVerification(
-    userId: string,
-    data: {
-      id_card_front: string;
-      id_card_back?: string;
-      id_card_image?: string;
-      id_card_type: string;
-      id_card_number?: string;
-    }
-  ): Promise<boolean> {
-    const front = data.id_card_front || data.id_card_image || '';
-    const back = data.id_card_back || front;
-
-    const updates = {
-      kyc_status: 'pending' as const,
-      is_verified: false,
-      id_card_front: front,
-      id_card_back: back,
-      id_card_image: front,
-      id_card_type: data.id_card_type,
-      id_card_number: data.id_card_number || '',
-      kyc_submitted_at: new Date().toISOString(),
-      kyc_rejection_reason: '',
-    };
-
-    try {
-      await supabase.from('profiles').update(updates).eq('id', userId);
-    } catch (e) {
-      console.warn('submitKycVerification DB warning:', e);
+  // =================== SMART EXPIRY CHECK ===================
+  getLeaseExpiryAlert(lease: Lease): {
+    isExpiring: boolean;
+    level: 'critical_red' | 'warning_orange' | 'caution_yellow' | 'none';
+    daysLeft: number;
+    hoursLeft: number;
+    labelAr: string;
+    labelFr: string;
+  } {
+    if (lease.status === 'ended') {
+      return {
+        isExpiring: false,
+        level: 'none',
+        daysLeft: 0,
+        hoursLeft: 0,
+        labelAr: 'منتهي',
+        labelFr: 'Expiré',
+      };
     }
 
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
-      if (stored) {
-        const profiles: UserProfile[] = JSON.parse(stored);
-        const idx = profiles.findIndex((p) => p.id === userId);
-        if (idx !== -1) {
-          profiles[idx] = { ...profiles[idx], ...updates };
-          localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
-        }
-      }
-    }
+    const end = new Date(lease.end_date);
+    const now = new Date();
+    const diffMs = end.getTime() - now.getTime();
+    const hoursLeft = Math.ceil(diffMs / (1000 * 60 * 60));
+    const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-    return true;
-  },
-
-  async reviewKycVerification(
-    userId: string,
-    decision: 'approve' | 'reject',
-    reason?: string
-  ): Promise<boolean> {
-    const isApproved = decision === 'approve';
-    const updates = isApproved
-      ? {
-          kyc_status: 'verified' as const,
-          is_active: true,
-          is_verified: true,
-          role: 'tenant' as const,
-          kyc_reviewed_at: new Date().toISOString(),
-          kyc_rejection_reason: '',
-        }
-      : {
-          kyc_status: 'rejected' as const,
-          is_active: false,
-          is_verified: false,
-          kyc_reviewed_at: new Date().toISOString(),
-          kyc_rejection_reason: reason || 'صورة بطاقة الهوية غير واضحة أو منتهية الصلاحية، يرجى إعادة رفع صورة واضحة ومقروءة للوجهين.',
+    // 1. Daily lease: Alert if < 24 hours
+    if (lease.period_type === 'night') {
+      if (hoursLeft <= 24) {
+        return {
+          isExpiring: true,
+          level: 'critical_red',
+          daysLeft,
+          hoursLeft,
+          labelAr: hoursLeft > 0 ? `متبقي أقل من ${hoursLeft} ساعة (عقد يومي)!` : 'انتهى العقد اليوم!',
+          labelFr: hoursLeft > 0 ? `Reste moins de ${hoursLeft}h (Bail journalier) !` : 'Expiré aujourd’hui !',
         };
-
-    try {
-      await supabase.from('profiles').update(updates).eq('id', userId);
-    } catch (e) {
-      console.warn('reviewKycVerification DB warning:', e);
-    }
-
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY_PROFILES);
-      if (stored) {
-        const profiles: UserProfile[] = JSON.parse(stored);
-        const idx = profiles.findIndex((p) => p.id === userId);
-        if (idx !== -1) {
-          profiles[idx] = { ...profiles[idx], ...updates };
-          localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
-        }
       }
     }
 
-    return true;
-  },
-
-  // --- APARTMENTS / LISTINGS ---
-  async getApartments(filters?: {
-    municipality?: string;
-    rentalType?: RentalType | 'all';
-    status?: ApartmentStatus | 'all';
-    search?: string;
-  }): Promise<Apartment[]> {
-    let list: Apartment[] = [];
-
-    // Attempt to load from Supabase listings_public or apartments
-    try {
-      let query = supabase.from('listings_public').select('*');
-      const { data, error } = await query.order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        list = data as Apartment[];
-      } else {
-        // Fallback to 'apartments' table if listings_public was not created
-        const { data: aptData, error: aptErr } = await supabase
-          .from('apartments')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (!aptErr && aptData && aptData.length > 0) {
-          list = aptData as Apartment[];
-        }
-      }
-    } catch (err) {
-      console.warn('Supabase listings fetch error:', err);
-    }
-
-    if (list.length === 0) {
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem(STORAGE_KEY_LISTINGS);
-        if (stored) {
-          list = JSON.parse(stored);
-        } else {
-          list = INITIAL_ADRAR_LISTINGS;
-          localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(INITIAL_ADRAR_LISTINGS));
-        }
-      } else {
-        list = INITIAL_ADRAR_LISTINGS;
+    // 2. Monthly lease: Alert if < 7 days
+    if (lease.period_type === 'month') {
+      if (daysLeft <= 7) {
+        return {
+          isExpiring: true,
+          level: 'warning_orange',
+          daysLeft,
+          hoursLeft,
+          labelAr: daysLeft > 0 ? `متبقي ${daysLeft} أيام (عقد شهري)!` : 'انتهى العقد اليوم!',
+          labelFr: daysLeft > 0 ? `Reste ${daysLeft} jours (Bail mensuel) !` : 'Expiré aujourd’hui !',
+        };
       }
     }
 
-    // Apply filters
-    if (filters) {
-      if (filters.municipality && filters.municipality !== 'الكل') {
-        list = list.filter((a) => a.municipality === filters.municipality);
+    // 3. Yearly lease: Alert if < 30 days
+    if (lease.period_type === 'year') {
+      if (daysLeft <= 30) {
+        return {
+          isExpiring: true,
+          level: 'caution_yellow',
+          daysLeft,
+          hoursLeft,
+          labelAr: daysLeft > 0 ? `متبقي ${daysLeft} يوماً (عقد سنوي)` : 'انتهى العقد اليوم!',
+          labelFr: daysLeft > 0 ? `Reste ${daysLeft} jours (Bail annuel)` : 'Expiré aujourd’hui !',
+        };
       }
-      if (filters.rentalType && filters.rentalType !== 'all') {
-        list = list.filter((a) => a.rental_type === filters.rentalType || a.rental_type === 'both');
-      }
-      if (filters.status && filters.status !== 'all') {
-        list = list.filter((a) => a.status === filters.status);
-      }
-      if (filters.search && filters.search.trim()) {
-        const q = filters.search.toLowerCase().trim();
-        list = list.filter(
-          (a) =>
-            a.title.toLowerCase().includes(q) ||
-            a.code.toLowerCase().includes(q) ||
-            a.address.toLowerCase().includes(q) ||
-            a.description.toLowerCase().includes(q)
-        );
-      }
-    }
-
-    return list;
-  },
-
-  async addApartment(apartment: Omit<Apartment, 'id' | 'created_at'>): Promise<Apartment> {
-    const newApt: Apartment = {
-      ...apartment,
-      id: `apt-${Date.now()}`,
-      created_at: new Date().toISOString(),
-    };
-
-    try {
-      await supabase.from('listings').insert([newApt]);
-      await supabase.from('apartments').insert([newApt]);
-    } catch (err) {
-      console.warn('Supabase addApartment error:', err);
-    }
-
-    // Update local cache
-    const current: Apartment[] = JSON.parse(
-      localStorage.getItem(STORAGE_KEY_LISTINGS) || JSON.stringify(INITIAL_ADRAR_LISTINGS)
-    );
-    current.unshift(newApt);
-    localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(current));
-    return newApt;
-  },
-
-  async updateApartment(id: string, updates: Partial<Apartment>): Promise<boolean> {
-    try {
-      await supabase.from('listings').update(updates).eq('id', id);
-      await supabase.from('apartments').update(updates).eq('id', id);
-    } catch (err) {
-      console.warn('Supabase updateApartment error:', err);
-    }
-
-    const current: Apartment[] = JSON.parse(
-      localStorage.getItem(STORAGE_KEY_LISTINGS) || JSON.stringify(INITIAL_ADRAR_LISTINGS)
-    );
-    const idx = current.findIndex((a) => a.id === id);
-    if (idx !== -1) {
-      current[idx] = { ...current[idx], ...updates };
-      localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(current));
-      return true;
-    }
-    return false;
-  },
-
-  async deleteApartment(id: string): Promise<boolean> {
-    try {
-      await supabase.from('listings').delete().eq('id', id);
-      await supabase.from('apartments').delete().eq('id', id);
-    } catch (err) {
-      console.warn('Supabase deleteApartment error:', err);
-    }
-
-    const current: Apartment[] = JSON.parse(
-      localStorage.getItem(STORAGE_KEY_LISTINGS) || JSON.stringify(INITIAL_ADRAR_LISTINGS)
-    );
-    const filtered = current.filter((a) => a.id !== id);
-    localStorage.setItem(STORAGE_KEY_LISTINGS, JSON.stringify(filtered));
-    return true;
-  },
-
-  async setApartmentStatus(id: string, status: ApartmentStatus): Promise<boolean> {
-    return this.updateApartment(id, { status });
-  },
-
-  // --- LEASES ---
-  async getLeases(): Promise<Lease[]> {
-    try {
-      const { data, error } = await supabase
-        .from('leases')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && data && data.length > 0) {
-        return data as Lease[];
-      }
-    } catch (err) {
-      console.warn('Supabase getLeases error:', err);
-    }
-
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY_LEASES);
-      if (stored) return JSON.parse(stored);
-    }
-    return [];
-  },
-
-  async getTenantActiveLease(tenantId: string): Promise<Lease | null> {
-    try {
-      const { data, error } = await supabase
-        .from('leases')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .in('status', ['active', 'expiring_soon'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!error && data) {
-        return data as Lease;
-      }
-    } catch (err) {
-      console.warn('Supabase getTenantActiveLease error:', err);
-    }
-
-    const leases = await this.getLeases();
-    return leases.find((l) => l.tenant_id === tenantId && (l.status === 'active' || l.status === 'expiring_soon')) || null;
-  },
-
-  async createLease(leaseData: {
-    apartment_id: string;
-    tenant_id: string;
-    tenant_name: string;
-    tenant_phone: string;
-    apartment_title: string;
-    apartment_code: string;
-    apartment_municipality: Municipality;
-    apartment_image?: string;
-    lease_type: 'monthly' | 'yearly';
-    rent_amount: number;
-    start_date: string;
-    end_date: string;
-    notes?: string;
-  }): Promise<Lease> {
-    const newLease: Lease = {
-      id: `lease-${Date.now()}`,
-      apartment_id: leaseData.apartment_id,
-      tenant_id: leaseData.tenant_id,
-      tenant_name: leaseData.tenant_name,
-      tenant_phone: leaseData.tenant_phone,
-      apartment_title: leaseData.apartment_title,
-      apartment_code: leaseData.apartment_code,
-      apartment_municipality: leaseData.apartment_municipality,
-      apartment_image: leaseData.apartment_image,
-      lease_type: leaseData.lease_type,
-      rent_amount: leaseData.rent_amount,
-      start_date: leaseData.start_date,
-      end_date: leaseData.end_date,
-      status: 'active',
-      notes: leaseData.notes || '',
-      created_at: new Date().toISOString(),
-    };
-
-    try {
-      await supabase.from('leases').insert([newLease]);
-      await supabase.from('apartments').update({ status: 'rented' }).eq('id', leaseData.apartment_id);
-      await supabase.from('listings').update({ status: 'rented' }).eq('id', leaseData.apartment_id);
-    } catch (err) {
-      console.warn('Supabase lease insert error:', err);
-    }
-
-    // Update local cache
-    const leases = await this.getLeases();
-    leases.unshift(newLease);
-    localStorage.setItem(STORAGE_KEY_LEASES, JSON.stringify(leases));
-
-    // Update apartment status to rented
-    await this.setApartmentStatus(leaseData.apartment_id, 'rented');
-
-    return newLease;
-  },
-
-  async endLease(leaseId: string): Promise<boolean> {
-    const leases = await this.getLeases();
-    const target = leases.find((l) => l.id === leaseId);
-    if (!target) return false;
-
-    try {
-      await supabase.from('leases').update({ status: 'ended' }).eq('id', leaseId);
-      await supabase.from('apartments').update({ status: 'available' }).eq('id', target.apartment_id);
-      await supabase.from('listings').update({ status: 'available' }).eq('id', target.apartment_id);
-    } catch (err) {
-      console.warn('Supabase endLease error:', err);
-    }
-
-    target.status = 'ended';
-    localStorage.setItem(STORAGE_KEY_LEASES, JSON.stringify(leases));
-    await this.setApartmentStatus(target.apartment_id, 'available');
-    return true;
-  },
-
-  // --- REVIEWS & RATINGS (STRICT: ONLY FOR TENANTS WITH ENDED LEASES) ---
-  async getApartmentReviews(apartmentId: string): Promise<Review[]> {
-    try {
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('*')
-        .eq('apartment_id', apartmentId)
-        .order('created_at', { ascending: false });
-
-      if (!error && data && data.length > 0) {
-        return data as Review[];
-      }
-    } catch (err) {
-      console.warn('Supabase getApartmentReviews error:', err);
-    }
-
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('adrar_live_reviews');
-      if (stored) {
-        const allReviews: Review[] = JSON.parse(stored);
-        return allReviews.filter((r) => r.apartment_id === apartmentId);
-      } else {
-        // Seed initial verified reviews for completed leases
-        const seedReviews: Review[] = [
-          {
-            id: 'rev-1',
-            apartment_id: 'apt-adr-1',
-            tenant_id: 'user-past-1',
-            tenant_name: 'سليمان التواتي (مهندس منتدب)',
-            rating: 5,
-            comment: 'شقة ممتازة جداً ونظام التكييف الصحراوي مع خزان الماء سعة 2500L أنقذنا طوال فصل الصيف بأدرار. الجيران محترمون للغاية وموقع حي 140 مسكن هادئ وقريب من كل المرافق.',
-            lease_id: 'lease-past-1',
-            created_at: '2026-01-20T10:00:00Z',
-          },
-          {
-            id: 'rev-2',
-            apartment_id: 'apt-adr-1',
-            tenant_id: 'user-past-2',
-            tenant_name: 'نور الدين بلخضر',
-            rating: 5,
-            comment: 'أتممت كراء سنة كاملة في هذه الشقة. النظافة والعزل الحراري والتجهيزات ممتازة والإدارة متعاونة وسريعة في الرد.',
-            lease_id: 'lease-past-2',
-            created_at: '2026-02-14T14:30:00Z',
-          },
-          {
-            id: 'rev-3',
-            apartment_id: 'apt-adr-2',
-            tenant_id: 'user-past-3',
-            tenant_name: 'محمد بوعبد الله',
-            rating: 5,
-            comment: 'تحفة معمارية حقيقية في تيميمون! الإطلالة على الواحة ساحرة والشرفة العلوية لا تضاهى. تجربة كراء فريدة أنصح بها بشدة.',
-            lease_id: 'lease-past-3',
-            created_at: '2026-03-01T11:20:00Z',
-          },
-        ];
-        localStorage.setItem('adrar_live_reviews', JSON.stringify(seedReviews));
-        return seedReviews.filter((r) => r.apartment_id === apartmentId);
-      }
-    }
-    return [];
-  },
-
-  async canUserReviewApartment(
-    userId: string,
-    apartmentId: string
-  ): Promise<{ canReview: boolean; reason?: string; leaseId?: string }> {
-    if (!userId) {
-      return {
-        canReview: false,
-        reason: 'يجب تسجيل الدخول بحساب المستأجر أولاً لإضافة التقييم.',
-      };
-    }
-
-    // 1. Check if user already reviewed this apartment
-    const existingReviews = await this.getApartmentReviews(apartmentId);
-    const alreadyReviewed = existingReviews.some((r) => r.tenant_id === userId);
-    if (alreadyReviewed) {
-      return {
-        canReview: false,
-        reason: 'لقد قمت بإضافة تقييم موثق لهذه الشقة مسبقاً. شكراً لمشاركتك تجربتك!',
-      };
-    }
-
-    // 2. Strict Rule: Check if user has an ENDED lease for this apartment
-    const leases = await this.getLeases();
-    const userLeasesForApartment = leases.filter(
-      (l) => l.tenant_id === userId && l.apartment_id === apartmentId
-    );
-
-    if (userLeasesForApartment.length === 0) {
-      return {
-        canReview: false,
-        reason: 'خاصية التقييم محصورة فقط بالمستأجرين الذين استأجروا هذه الشقة وانتهى عقد إيجارهم لضمان أقصى درجات المصداقية.',
-      };
-    }
-
-    const endedLease = userLeasesForApartment.find((l) => l.status === 'ended');
-    if (!endedLease) {
-      return {
-        canReview: false,
-        reason: 'عقد كراء هذه الشقة لا يزال سارياً حالياً. ستتمكن من تقييم الشقة فور انتهاء فترة العقد وتسليمها للإدارة.',
-      };
     }
 
     return {
-      canReview: true,
-      leaseId: endedLease.id,
+      isExpiring: false,
+      level: 'none',
+      daysLeft,
+      hoursLeft,
+      labelAr: `سارٍ حتى ${lease.end_date}`,
+      labelFr: `Valide jusqu’au ${lease.end_date}`,
     };
-  },
-
-  async submitReview(data: {
-    apartment_id: string;
-    tenant_id: string;
-    tenant_name: string;
-    rating: number;
-    comment: string;
-    lease_id?: string;
-  }): Promise<{ success: boolean; review?: Review; error?: string }> {
-    // Re-verify eligibility
-    const eligibility = await this.canUserReviewApartment(data.tenant_id, data.apartment_id);
-    if (!eligibility.canReview) {
-      return { success: false, error: eligibility.reason };
-    }
-
-    const newReview: Review = {
-      id: `rev-${Date.now()}`,
-      apartment_id: data.apartment_id,
-      tenant_id: data.tenant_id,
-      tenant_name: data.tenant_name,
-      rating: Math.min(5, Math.max(1, data.rating)),
-      comment: data.comment.trim(),
-      lease_id: data.lease_id || eligibility.leaseId,
-      created_at: new Date().toISOString(),
-    };
-
-    try {
-      await supabase.from('reviews').insert([newReview]);
-    } catch (err) {
-      console.warn('Supabase insert review error:', err);
-    }
-
-    // Update local cache
-    let currentReviews: Review[] = [];
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('adrar_live_reviews');
-      if (stored) {
-        currentReviews = JSON.parse(stored);
-      }
-      currentReviews.unshift(newReview);
-      localStorage.setItem('adrar_live_reviews', JSON.stringify(currentReviews));
-    }
-
-    return { success: true, review: newReview };
   },
 };

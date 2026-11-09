@@ -1,84 +1,170 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { dbService, isValidAlgerianPhone, seedAdminAndInitialUsersInSupabase, supabase } from '../services/supabase';
-import { Apartment, UserProfile, UserRole } from '../types';
+import {
+  dbService,
+  isAdminPhoneNumber,
+  isValidAlgerianPhone,
+  normalizeAlgerianPhone,
+  supabase,
+} from '../services/supabase';
+import { Language, Lease, Listing, ThemeMode, UserProfile } from '../types';
 
 interface AuthContextType {
   currentUser: UserProfile | null;
   isLoading: boolean;
   currentPath: string; // '/app' | '/admin' | '/my-rentals'
   navigateTo: (path: string) => void;
+  // Language & Theme
+  language: Language;
+  toggleLanguage: () => void;
+  theme: ThemeMode;
+  toggleTheme: () => void;
+  // Notification Toast
   notification: { message: string; type: 'success' | 'warning' | 'error' } | null;
-  clearNotification: () => void;
   showNotification: (message: string, type?: 'success' | 'warning' | 'error') => void;
-  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
-  register: (data: {
+  clearNotification: () => void;
+  // Phone Auth
+  loginWithPhone: (data: {
     fullName: string;
-    email: string;
-    password: string;
     phone: string;
+    pin: string;
   }) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
-  // Auth Modal trigger for guests trying to book
+  logout: () => void;
+  // Auth Modal
   authModalOpen: boolean;
-  openAuthModal: (promptMessage?: string, targetApartment?: Apartment) => void;
+  openAuthModal: (promptMessage?: string, targetListing?: Listing) => void;
   closeAuthModal: () => void;
   authModalPrompt: string;
-  pendingApartment: Apartment | null;
-  clearPendingApartment: () => void;
-  // KYC Identity Verification Modal
-  kycModalOpen: boolean;
-  openKycModal: () => void;
-  closeKycModal: () => void;
-  submitKyc: (data: {
-    id_card_front: string;
-    id_card_back?: string;
-    id_card_image?: string;
-    id_card_type: string;
-    id_card_number?: string;
-  }) => Promise<boolean>;
+  pendingListing: Listing | null;
+  // Active tenant lease
+  activeTenantLease: Lease | null;
+  refreshTenantLease: () => Promise<void>;
   refreshCurrentUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const STORAGE_KEY_AUTH = 'zayd_user_auth_session';
+const STORAGE_KEY_LANG = 'zayd_user_language';
+const STORAGE_KEY_THEME = 'zayd_user_theme';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentPath, setCurrentPath] = useState<string>('/app');
+  const [language, setLanguage] = useState<Language>('ar');
+  const [theme, setTheme] = useState<ThemeMode>('dark');
   const [notification, setNotification] = useState<{
     message: string;
     type: 'success' | 'warning' | 'error';
   } | null>(null);
 
-  // KYC Modal state
-  const [kycModalOpen, setKycModalOpen] = useState(false);
-  const openKycModal = () => setKycModalOpen(true);
-  const closeKycModal = () => setKycModalOpen(false);
-
-  // Guest booking interceptor modal
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalPrompt, setAuthModalPrompt] = useState('');
-  const [pendingApartment, setPendingApartment] = useState<Apartment | null>(null);
+  const [pendingListing, setPendingListing] = useState<Listing | null>(null);
+  const [activeTenantLease, setActiveTenantLease] = useState<Lease | null>(null);
 
-  const openAuthModal = (
-    promptMessage = 'يرجى تسجيل الدخول أو إنشاء حساب للمتابعة وحجز الشقة',
-    targetApartment?: Apartment
-  ) => {
-    setAuthModalPrompt(promptMessage);
-    if (targetApartment) {
-      setPendingApartment(targetApartment);
+  // Initialize Language, Theme and Session from LocalStorage & Supabase
+  useEffect(() => {
+    // 1. Language
+    const savedLang = localStorage.getItem(STORAGE_KEY_LANG) as Language;
+    if (savedLang === 'fr' || savedLang === 'ar') {
+      setLanguage(savedLang);
+      document.documentElement.lang = savedLang;
+      document.documentElement.dir = savedLang === 'ar' ? 'rtl' : 'ltr';
+    } else {
+      document.documentElement.lang = 'ar';
+      document.documentElement.dir = 'rtl';
     }
-    setAuthModalOpen(true);
+
+    // 2. Theme (Default Dark Luxury Obsidian Navy #060D18)
+    const savedTheme = localStorage.getItem(STORAGE_KEY_THEME) as ThemeMode;
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      setTheme(savedTheme);
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } else {
+      setTheme('dark');
+      document.documentElement.classList.add('dark');
+    }
+
+    // 3. User Session
+    const initSession = async () => {
+      setIsLoading(true);
+      try {
+        const savedAuth = localStorage.getItem(STORAGE_KEY_AUTH);
+        if (savedAuth) {
+          const user: UserProfile = JSON.parse(savedAuth);
+          if (user && user.phone) {
+            // Re-verify admin status dynamically
+            const isAdmin = isAdminPhoneNumber(user.phone);
+            user.role = isAdmin ? 'admin' : user.role || 'tenant';
+            user.role_code = isAdmin ? 1 : 0;
+            setCurrentUser(user);
+
+            // Fetch active lease for this phone
+            const lease = await dbService.getTenantActiveLease(user.phone);
+            setActiveTenantLease(lease);
+
+            if (user.role === 'admin' && window.location.pathname.includes('admin')) {
+              setCurrentPath('/admin');
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Session init note:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initSession();
+
+    // Listen for storage events (e.g. admin updates lease in another tab or action)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'zayd_live_leases' && currentUser?.phone) {
+        dbService.getTenantActiveLease(currentUser.phone).then(setActiveTenantLease);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Periodic subtle polling to ensure tenant always has live status
+  useEffect(() => {
+    if (!currentUser?.phone) return;
+    const interval = setInterval(async () => {
+      const lease = await dbService.getTenantActiveLease(currentUser.phone);
+      setActiveTenantLease(lease);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  const toggleLanguage = () => {
+    const nextLang: Language = language === 'ar' ? 'fr' : 'ar';
+    setLanguage(nextLang);
+    localStorage.setItem(STORAGE_KEY_LANG, nextLang);
+    document.documentElement.lang = nextLang;
+    document.documentElement.dir = nextLang === 'ar' ? 'rtl' : 'ltr';
   };
 
-  const closeAuthModal = () => {
-    setAuthModalOpen(false);
-    setAuthModalPrompt('');
+  const toggleTheme = () => {
+    const nextTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    localStorage.setItem(STORAGE_KEY_THEME, nextTheme);
+    if (nextTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   };
 
-  const clearPendingApartment = () => setPendingApartment(null);
-
-  const showNotification = (message: string, type: 'success' | 'warning' | 'error' = 'success') => {
+  const showNotification = (
+    message: string,
+    type: 'success' | 'warning' | 'error' = 'success'
+  ) => {
     setNotification({ message, type });
     setTimeout(() => {
       setNotification((curr) => (curr?.message === message ? null : curr));
@@ -87,115 +173,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearNotification = () => setNotification(null);
 
-  // Check current session on initial load (Supabase session + fallback localStorage)
-  useEffect(() => {
-    const initSession = async () => {
-      setIsLoading(true);
-      try {
-        // Seed admin and initial platform accounts into Supabase in background
-        seedAdminAndInitialUsersInSupabase().catch(() => {});
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (!sessionError && session?.user) {
-          const profile = await dbService.getProfile(session.user.id);
-          if (profile) {
-            setCurrentUser(profile);
-            localStorage.setItem('adrar_user_session', JSON.stringify(profile));
-            if (profile.role === 'admin' && window.location.pathname.includes('admin')) {
-              setCurrentPath('/admin');
-            } else {
-              setCurrentPath('/app');
-            }
-          } else {
-            // Create user profile in profiles table if missing
-            const metadata = session.user.user_metadata || {};
-            const isAdm = isAdminEmail(session.user.email || '');
-            const newProf: UserProfile = {
-              id: session.user.id,
-              email: session.user.email || '',
-              full_name: metadata.full_name || (isAdm ? 'مشرف المنصة (الإدارة)' : 'مستخدم المنصة'),
-              phone: metadata.phone || '0696980328',
-              role: isAdm ? 'admin' : ((metadata.role as UserRole) || 'client'),
-              role_code: isAdm ? 1 : 0,
-              is_active: isAdm ? true : Boolean(metadata.is_active),
-              kyc_status: isAdm ? 'verified' : ((metadata.kyc_status as any) || 'unverified'),
-              created_at: new Date().toISOString(),
-            };
-            await supabase.from('profiles').upsert(newProf);
-            setCurrentUser(newProf);
-            localStorage.setItem('adrar_user_session', JSON.stringify(newProf));
-            setCurrentPath(isAdm ? '/admin' : '/app');
-          }
-        } else {
-          // Check localStorage fallback session
-          const savedSession = localStorage.getItem('adrar_user_session');
-          if (savedSession) {
-            try {
-              const parsed: UserProfile = JSON.parse(savedSession);
-              if (parsed && parsed.email) {
-                // Verify with DB
-                const { data: dbProf } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('email', parsed.email)
-                  .maybeSingle();
-                
-                const activeProfile = (dbProf as UserProfile) || parsed;
-                setCurrentUser(activeProfile);
-                if (activeProfile.role === 'admin' && window.location.pathname.includes('admin')) {
-                  setCurrentPath('/admin');
-                } else {
-                  setCurrentPath('/app');
-                }
-              } else {
-                setCurrentUser(null);
-                setCurrentPath('/app');
-              }
-            } catch {
-              setCurrentUser(null);
-              setCurrentPath('/app');
-            }
-          } else {
-            // GUEST by default!
-            setCurrentUser(null);
-            setCurrentPath('/app');
-          }
-        }
-      } catch (err) {
-        console.warn('Session init:', err);
-        setCurrentUser(null);
-        setCurrentPath('/app');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initSession();
-
-    // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const profile = await dbService.getProfile(session.user.id);
-        if (profile) {
-          setCurrentUser(profile);
-          localStorage.setItem('adrar_user_session', JSON.stringify(profile));
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        localStorage.removeItem('adrar_user_session');
-        setCurrentPath('/app');
-      }
-    });
-
-    return () => {
-      authListener?.subscription?.unsubscribe();
-    };
-  }, []);
-
   const navigateTo = (path: string) => {
-    // STRICT SECURITY GUARD for /admin:
     if (path === '/admin') {
       if (!currentUser || currentUser.role !== 'admin') {
-        showNotification('عذراً، الوصول إلى لوحة تحكم الإدارة مخصص للمشرفين والمسؤولين فقط.', 'warning');
+        showNotification(
+          language === 'ar'
+            ? 'الوصول إلى لوحة الإدارة محصور بالمشرفين المعتمدين.'
+            : 'Accès réservé exclusivement aux administrateurs autorisés.',
+          'warning'
+        );
         setCurrentPath('/app');
         return;
       }
@@ -204,352 +190,136 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const ADMIN_IDENTIFIERS = [
-    'rental@adrar01',
-    'rental@adrar01.com',
-    'rental@adrar01.dz',
-    'admin@adrar-immo.dz',
-    'admin@adrar.dz',
-    'haithembenzerga@gmail.com',
-  ];
-
-  const isAdminEmail = (identifier: string) => {
-    if (!identifier) return false;
-    const clean = identifier.trim().toLowerCase();
-    return (
-      ADMIN_IDENTIFIERS.includes(clean) ||
-      clean.includes('rental@adrar01') ||
-      clean.startsWith('admin') ||
-      clean.includes('haithembenzerga')
-    );
+  const openAuthModal = (promptMessage = '', targetListing?: Listing) => {
+    setAuthModalPrompt(promptMessage);
+    if (targetListing) setPendingListing(targetListing);
+    setAuthModalOpen(true);
   };
 
-  const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
-    setIsLoading(true);
-    try {
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanPass = pass.trim();
-      const shouldBeAdmin = isAdminEmail(cleanEmail);
-
-      // Direct, instantaneous access for Admin credentials
-      if (shouldBeAdmin && (cleanPass === '123456' || cleanPass.length >= 4)) {
-        const adminProfile: UserProfile = {
-          id: 'admin-rental-01',
-          email: cleanEmail,
-          full_name: cleanEmail.includes('rental')
-            ? 'مدير المنصة (rental@adrar01)'
-            : 'هيثم بن زرقة (مدير المنصة)',
-          phone: '0696980328',
-          role: 'admin',
-          role_code: 1,
-          is_active: true,
-          kyc_status: 'verified',
-          created_at: new Date().toISOString(),
-        };
-
-        try {
-          await supabase.from('profiles').upsert(adminProfile);
-        } catch (err) {
-          console.warn('Upsert admin profile:', err);
-        }
-
-        setCurrentUser(adminProfile);
-        localStorage.setItem('adrar_user_session', JSON.stringify(adminProfile));
-        closeAuthModal();
-        showNotification('مرحباً بك! تم تسجيل الدخول بنجاح كمسؤول المنصة', 'success');
-        navigateTo('/admin');
-        setIsLoading(false);
-        return { success: true };
-      }
-
-      // 1. Try signInWithPassword via Supabase
-      let authUser: any = null;
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail.includes('@') && cleanEmail.includes('.') ? cleanEmail : `${cleanEmail}@adrar.dz`,
-          password: cleanPass,
-        });
-
-        if (!error && data?.user) {
-          authUser = data.user;
-        }
-      } catch (e) {
-        console.warn('Supabase signInWithPassword:', e);
-      }
-
-      // 2. Check if profile exists in public.profiles table
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('email', cleanEmail)
-        .maybeSingle();
-
-      if (existingProfile) {
-        const profile = existingProfile as UserProfile;
-        if (shouldBeAdmin && profile.role !== 'admin') {
-          profile.role = 'admin';
-          profile.role_code = 1;
-          profile.kyc_status = 'verified';
-          await supabase.from('profiles').update({ role: 'admin', role_code: 1, kyc_status: 'verified' }).eq('id', profile.id);
-        }
-        setCurrentUser(profile);
-        localStorage.setItem('adrar_user_session', JSON.stringify(profile));
-        closeAuthModal();
-        showNotification(`أهلاً بك يا ${profile.full_name} في منصة عقارات أدرار`, 'success');
-        if (profile.role === 'admin') {
-          navigateTo('/admin');
-        } else {
-          navigateTo('/app');
-        }
-        setIsLoading(false);
-        return { success: true };
-      }
-
-      if (authUser) {
-        const userProfile: UserProfile = {
-          id: authUser.id,
-          email: cleanEmail,
-          full_name: authUser.user_metadata?.full_name || (shouldBeAdmin ? 'مشرف المنصة' : 'مستخدم المنصة'),
-          phone: authUser.user_metadata?.phone || '0696980328',
-          role: shouldBeAdmin ? 'admin' : ((authUser.user_metadata?.role as UserRole) || 'client'),
-          role_code: shouldBeAdmin ? 1 : 0,
-          is_active: shouldBeAdmin ? true : (authUser.user_metadata?.is_active ?? false),
-          kyc_status: shouldBeAdmin ? 'verified' : ((authUser.user_metadata?.kyc_status as any) || 'unverified'),
-          created_at: new Date().toISOString(),
-        };
-        try {
-          await supabase.from('profiles').upsert(userProfile);
-        } catch {}
-        setCurrentUser(userProfile);
-        localStorage.setItem('adrar_user_session', JSON.stringify(userProfile));
-        closeAuthModal();
-        showNotification(`أهلاً بك يا ${userProfile.full_name}`, 'success');
-        if (userProfile.role === 'admin') {
-          navigateTo('/admin');
-        } else {
-          navigateTo('/app');
-        }
-        setIsLoading(false);
-        return { success: true };
-      }
-
-      // If user typed identifier and password, seamlessly create session
-      if (cleanPass.length >= 4) {
-        const newProf: UserProfile = {
-          id: `usr-${Date.now()}`,
-          email: cleanEmail,
-          full_name: cleanEmail.split('@')[0] || 'مستخدم المنصة',
-          phone: '0696980328',
-          role: shouldBeAdmin ? 'admin' : 'client',
-          role_code: shouldBeAdmin ? 1 : 0,
-          is_active: shouldBeAdmin ? true : false,
-          kyc_status: shouldBeAdmin ? 'verified' : 'unverified',
-          created_at: new Date().toISOString(),
-        };
-        try {
-          await supabase.from('profiles').upsert(newProf);
-        } catch {}
-        setCurrentUser(newProf);
-        localStorage.setItem('adrar_user_session', JSON.stringify(newProf));
-        closeAuthModal();
-        showNotification(`أهلاً بك يا ${newProf.full_name}`, 'success');
-        if (newProf.role === 'admin') {
-          navigateTo('/admin');
-        } else {
-          navigateTo('/app');
-        }
-        setIsLoading(false);
-        return { success: true };
-      }
-
-      setIsLoading(false);
-      return {
-        success: false,
-        error: 'يرجى إدخال كلمة المرور (4 أحرف أو أرقام على الأقل).',
-      };
-    } catch (err: any) {
-      setIsLoading(false);
-      return { success: false, error: err?.message || 'فشل تسجيل الدخول. يرجى المحاولة لاحقاً.' };
-    }
+  const closeAuthModal = () => {
+    setAuthModalOpen(false);
+    setAuthModalPrompt('');
+    setPendingListing(null);
   };
 
-  const refreshCurrentUser = async () => {
-    if (!currentUser?.id) return;
-    try {
-      const updated = await dbService.getProfile(currentUser.id);
-      if (updated) {
-        setCurrentUser(updated);
-        localStorage.setItem('adrar_user_session', JSON.stringify(updated));
-      }
-    } catch (err) {
-      console.warn('refreshCurrentUser error:', err);
-    }
-  };
-
-  const submitKyc = async (data: {
-    id_card_front: string;
-    id_card_back?: string;
-    id_card_image?: string;
-    id_card_type: string;
-    id_card_number?: string;
-  }): Promise<boolean> => {
-    if (!currentUser?.id) {
-      showNotification('يرجى تسجيل الدخول أولاً لرفع بطاقة الهوية.', 'warning');
-      return false;
-    }
-
-    try {
-      await dbService.submitKycVerification(currentUser.id, data);
-      const front = data.id_card_front || data.id_card_image || '';
-      const back = data.id_card_back || front;
-
-      const updatedUser: UserProfile = {
-        ...currentUser,
-        kyc_status: 'pending',
-        is_verified: false,
-        id_card_front: front,
-        id_card_back: back,
-        id_card_image: front,
-        id_card_type: data.id_card_type,
-        id_card_number: data.id_card_number,
-        kyc_submitted_at: new Date().toISOString(),
-        kyc_rejection_reason: '',
-      };
-      setCurrentUser(updatedUser);
-      localStorage.setItem('adrar_user_session', JSON.stringify(updatedUser));
-      closeKycModal();
-      showNotification(
-        'تم إرسال وثائق الهوية بنجاح! حسابك الآن قيد المراجعة من طرف إدارة عقارات أدرار.',
-        'success'
-      );
-      return true;
-    } catch (err) {
-      console.warn('submitKyc error:', err);
-      showNotification('تعذر رفع وثيقة الهوية، يرجى المحاولة مرة أخرى.', 'error');
-      return false;
-    }
-  };
-
-  const register = async (data: {
+  // Phone-Only Authentication
+  const loginWithPhone = async (data: {
     fullName: string;
-    email: string;
-    password: string;
     phone: string;
+    pin: string;
   }): Promise<{ success: boolean; error?: string }> => {
     if (!data.fullName.trim()) {
-      return { success: false, error: 'يرجى إدخال الاسم الكامل.' };
+      return {
+        success: false,
+        error: language === 'ar' ? 'يرجى إدخال الاسم واللقب' : 'Veuillez saisir votre nom et prénom',
+      };
     }
-    if (!data.email.trim()) {
-      return { success: false, error: 'يرجى إدخال البريد الإلكتروني أو اسم المستخدم.' };
-    }
-    // Strict Algerian phone validation
-    const cleanPhone = data.phone.trim();
-    if (!cleanPhone) {
-      return { success: false, error: 'يرجى إدخال رقم الهاتف الجزائري.' };
-    }
+
+    const cleanPhone = data.phone.trim().replace(/[\s-]/g, '');
     if (!isValidAlgerianPhone(cleanPhone)) {
       return {
         success: false,
-        error: 'صيغة رقم الهاتف غير صحيحة. يجب أن يكون رقم جزائري يبدأ بـ 05 أو 06 أو 07 متبوعاً بـ 8 أرقام (مثال: 0696980328).',
+        error:
+          language === 'ar'
+            ? 'رقم الهاتف الجزائري غير صحيح. يجب أن يبدأ بـ 05 أو 06 أو 07 متبوعاً بـ 8 أرقام.'
+            : 'Numéro algérien invalide. Il doit commencer par 05, 06 ou 07 suivi de 8 chiffres.',
       };
     }
-    if (!data.password || data.password.length < 4) {
-      return { success: false, error: 'كلمة المرور يجب أن لا تقل عن 4 أحرف أو أرقام.' };
+
+    if (!data.pin || data.pin.length < 4) {
+      return {
+        success: false,
+        error:
+          language === 'ar'
+            ? 'الرمز السري (PIN) يجب أن يتكون من 4 أرقام على الأقل'
+            : 'Le code PIN doit comporter au moins 4 chiffres.',
+      };
     }
 
     setIsLoading(true);
     try {
-      const cleanEmail = data.email.trim().toLowerCase();
-      const isAdm = isAdminEmail(cleanEmail);
-      const assignedRole: UserRole = isAdm ? 'admin' : 'client';
-      const roleCode = isAdm ? 1 : 0;
-      const initialKycStatus = isAdm ? 'verified' : 'unverified';
-      const initialActive = isAdm ? true : false; // Non-admin accounts start inactive until KYC verification!
-
-      // 1. Send real signup to Supabase Auth so it ALWAYS shows in Supabase dashboard under Authentication -> Users!
-      const validAuthEmail =
-        cleanEmail.includes('@') && cleanEmail.includes('.')
-          ? cleanEmail
-          : `${cleanEmail.replace(/[^a-zA-Z0-9]/g, '') || 'user'}@adrar-immo.dz`;
-
-      let authUserId: string | null = null;
-      try {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: validAuthEmail,
-          password: data.password,
-          options: {
-            data: {
-              full_name: data.fullName.trim(),
-              phone: cleanPhone,
-              role: assignedRole,
-              role_code: roleCode,
-              kyc_status: initialKycStatus,
-            },
-          },
-        });
-
-        if (!authError && authData?.user) {
-          authUserId = authData.user.id;
-        } else if (authError) {
-          console.warn('Supabase Auth signUp note:', authError.message);
-        }
-      } catch (authErr) {
-        console.warn('Supabase signUp catch:', authErr);
-      }
-
-      // 2. Prepare profile with 3 explicit states: unverified -> pending_review -> verified
-      const profileId = authUserId || `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      const newProfile: UserProfile = {
-        id: profileId,
-        email: cleanEmail,
+      const isAdmin = isAdminPhoneNumber(cleanPhone);
+      const userProfile: UserProfile = {
+        id: `usr-${cleanPhone}`,
         full_name: data.fullName.trim(),
         phone: cleanPhone,
-        role: assignedRole,
-        role_code: roleCode,
-        is_active: initialActive,
-        kyc_status: initialKycStatus,
+        role: isAdmin ? 'admin' : 'tenant',
+        role_code: isAdmin ? 1 : 0,
+        pin: data.pin,
         created_at: new Date().toISOString(),
       };
 
-      // 3. Save into Supabase DB table AND cache via dbService.saveProfile
-      await dbService.saveProfile(newProfile);
+      // Save to Supabase and Cache
+      await dbService.saveProfile(userProfile);
 
-      setCurrentUser(newProfile);
-      localStorage.setItem('adrar_user_session', JSON.stringify(newProfile));
+      setCurrentUser(userProfile);
+      localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(userProfile));
+
+      // Fetch active lease
+      const lease = await dbService.getTenantActiveLease(cleanPhone);
+      setActiveTenantLease(lease);
+
       closeAuthModal();
 
-      if (isAdm) {
-        showNotification(`مرحباً بك يا ${newProfile.full_name} في لوحة الإدارة!`, 'success');
+      if (isAdmin) {
+        showNotification(
+          language === 'ar'
+            ? `مرحباً بك ${userProfile.full_name} في لوحة تحكم وكالة زيد!`
+            : `Bienvenue ${userProfile.full_name} au panneau d'administration ZAYD !`,
+          'success'
+        );
         navigateTo('/admin');
       } else {
         showNotification(
-          `تم إنشاء حسابك بنجاح! حسابك غير مفعل حالياً (غير مفعل) - يرجى رفع بطاقة الهوية لتفعيله ومتابعة الحجز.`,
-          'warning'
+          language === 'ar'
+            ? `أهلاً بك ${userProfile.full_name} في وكالة زيد العقارية`
+            : `Bienvenue ${userProfile.full_name} chez ZAYD Agence Immobilière`,
+          'success'
         );
         navigateTo('/app');
-        // Prompt KYC modal immediately for unverified user
-        setTimeout(() => {
-          setKycModalOpen(true);
-        }, 600);
       }
 
       setIsLoading(false);
       return { success: true };
     } catch (err: any) {
       setIsLoading(false);
-      return { success: false, error: err?.message || 'حدث خطأ أثناء إنشاء الحساب.' };
+      return {
+        success: false,
+        error: err?.message || 'حدث خطأ أثناء تسجيل الدخول',
+      };
     }
   };
 
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.warn('SignOut error:', err);
-    }
+  const logout = () => {
     setCurrentUser(null);
+    setActiveTenantLease(null);
+    localStorage.removeItem(STORAGE_KEY_AUTH);
     setCurrentPath('/app');
-    showNotification('تم تسجيل الخروج بنجاح. نراك قريباً في أدرار!', 'success');
+    showNotification(
+      language === 'ar'
+        ? 'تم تسجيل الخروج بنجاح. نتمنى لكم يوماً سعيداً في أدرار!'
+        : 'Déconnexion réussie. À très bientôt à Adrar !',
+      'success'
+    );
+  };
+
+  const refreshTenantLease = async () => {
+    if (!currentUser?.phone) return;
+    const lease = await dbService.getTenantActiveLease(currentUser.phone);
+    setActiveTenantLease(lease);
+  };
+
+  const refreshCurrentUser = async () => {
+    if (!currentUser?.phone) return;
+    const profiles = await dbService.getProfiles();
+    const updated = profiles.find(
+      (p) => normalizeAlgerianPhone(p.phone) === normalizeAlgerianPhone(currentUser.phone)
+    );
+    if (updated) {
+      setCurrentUser(updated);
+      localStorage.setItem(STORAGE_KEY_AUTH, JSON.stringify(updated));
+    }
+    await refreshTenantLease();
   };
 
   return (
@@ -559,22 +329,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         currentPath,
         navigateTo,
+        language,
+        toggleLanguage,
+        theme,
+        toggleTheme,
         notification,
-        clearNotification,
         showNotification,
-        login,
-        register,
+        clearNotification,
+        loginWithPhone,
         logout,
         authModalOpen,
         openAuthModal,
         closeAuthModal,
         authModalPrompt,
-        pendingApartment,
-        clearPendingApartment,
-        kycModalOpen,
-        openKycModal,
-        closeKycModal,
-        submitKyc,
+        pendingListing,
+        activeTenantLease,
+        refreshTenantLease,
         refreshCurrentUser,
       }}
     >
@@ -585,8 +355,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };

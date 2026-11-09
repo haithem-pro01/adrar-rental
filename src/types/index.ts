@@ -1,95 +1,72 @@
-export type UserRole = 'admin' | 'tenant' | 'client';
+export type UserRole = 'tenant' | 'admin';
 
-export type KycStatus = 'unverified' | 'pending' | 'pending_review' | 'verified' | 'rejected';
+export type RentPeriod = 'night' | 'month' | 'year';
+
+export type ListingStatus = 'available' | 'rented' | 'hidden';
+
+export type AdrarNeighborhood =
+  | 'حي السلام'
+  | 'حي قصر تيليلين'
+  | 'وسط المدينة'
+  | 'حي 140 مسكن'
+  | 'حي المطار'
+  | 'حي البدر'
+  | 'حي 20 أوت';
 
 export interface UserProfile {
   id: string;
-  email: string;
   full_name: string;
   phone: string;
   role: UserRole;
-  role_code?: number; // 1 = Admin, 0 = Customers / Tenants
-  is_active: boolean;
-  is_verified?: boolean; // Verified tenant status
-  kyc_status: KycStatus; // 'unverified' | 'pending' | 'verified' | 'rejected'
-  id_card_front?: string; // Front image path / data
-  id_card_back?: string; // Back image path / data
-  id_card_image?: string; // Legacy fallback
-  id_card_type?: string;
-  id_card_number?: string;
-  kyc_submitted_at?: string;
-  kyc_reviewed_at?: string;
-  kyc_rejection_reason?: string;
+  role_code: number; // 1 = Admin, 0 = Tenant
+  pin?: string;
   created_at: string;
+  updated_at?: string;
 }
 
-export type Municipality =
-  | 'أدرار'
-  | 'تيميمون'
-  | 'رقان'
-  | 'فنوغيل'
-  | 'تسابيت'
-  | 'زاوية كنتة'
-  | 'أولف'
-  | 'شروين';
-
-export type RentalType = 'monthly' | 'yearly' | 'both';
-
-export type ApartmentStatus = 'available' | 'rented' | 'hidden';
-
-export interface Apartment {
+export interface Listing {
   id: string;
-  code: string; // e.g. ADR-1042
-  title: string;
-  description: string;
-  municipality: Municipality;
-  address: string;
-  rental_type: RentalType;
-  monthly_price: number; // DZD
-  yearly_price: number; // DZD
-  rooms: number;
+  ref_code: string; // e.g. ADR-1042
+  title_ar: string;
+  title_fr: string;
+  description_ar?: string;
+  description_fr?: string;
+  neighborhood: AdrarNeighborhood | string;
+  property_type: 'apartment' | 'villa' | 'duplex' | 'studio';
+  bedrooms: number;
   bathrooms: number;
-  area: number; // m²
-  floor: number | string;
-  amenities: string[];
-  images: string[];
-  status: ApartmentStatus;
-  landlord_phone?: string;
-  landlord_name?: string;
-  average_rating?: number;
-  reviews_count?: number;
+  living_rooms: number;
+  area_m2: number;
+  price_night: number; // DZD per day
+  price_month: number; // DZD per month
+  price_year: number; // DZD per year
+  contact_whatsapp: string; // Default: 213550472523
+  status: ListingStatus;
+  image_url: string;
+  images?: string[];
+  amenities?: string[];
   created_at: string;
 }
-
-export type LeaseStatus = 'active' | 'expiring_soon' | 'ended';
 
 export interface Lease {
   id: string;
-  apartment_id: string;
-  tenant_id: string;
+  listing_id: string;
   tenant_name: string;
   tenant_phone: string;
-  tenant_email?: string;
-  apartment_title: string;
-  apartment_code: string;
-  apartment_municipality: Municipality;
-  apartment_image?: string;
-  lease_type: 'monthly' | 'yearly';
-  rent_amount: number; // DZD
+  period_type: RentPeriod; // 'night' | 'month' | 'year'
+  agreed_price: number;
   start_date: string; // YYYY-MM-DD
   end_date: string; // YYYY-MM-DD
-  status: LeaseStatus;
+  status: 'active' | 'expiring_soon' | 'ended';
   notes?: string;
   created_at: string;
+  // Denormalized property details for quick display
+  listing_title?: string;
+  listing_ref?: string;
+  listing_image?: string;
+  neighborhood?: string;
 }
 
-export interface Review {
-  id: string;
-  apartment_id: string;
-  tenant_id: string;
-  tenant_name: string;
-  rating: number; // 1 to 5 stars
-  comment: string;
-  lease_id?: string;
-  created_at: string;
-}
+export type Language = 'ar' | 'fr';
+
+export type ThemeMode = 'dark' | 'light';
