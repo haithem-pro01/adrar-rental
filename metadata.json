@@ -1,0 +1,6 @@
+{
+  "name": "منصة كراء العقارات بولاية أدرار",
+  "description": "منصة متطورة لكراء الشقق والمنازل الفاخرة بولاية أدرار - كراء شهري وسنوي، حجز واتساب مباشر، وإدارة عقود ذكية للمستأجرين والمشرفين.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
